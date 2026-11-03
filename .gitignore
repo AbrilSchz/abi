@@ -18,3 +18,8 @@ node_modules/
 # Datos temporales pesados de pre-procesamiento
 data/raw/
 *.tmp
+node_modules/
+dist/
+.vite/
+*.log
+.DS_Store

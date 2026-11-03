@@ -1,0 +1,29 @@
+{
+  "name": "marswalk-3d",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Marswalk 3D — Exploración EVA e inteligencia topográfica en Marte (NASA Space Apps)",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 8000",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write \"src/**/*.{js,css}\" \"*.{js,html,md}\"",
+    "validate:data": "python3 data_pipeline/validate_contracts.py",
+    "check": "npm run lint && npm run validate:data && npm run build"
+  },
+  "dependencies": {
+    "three": "0.169.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/three": "^0.169.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^17.14.0",
+    "prettier": "^3.3.0",
+    "vite": "^6.0.0"
+  }
+}

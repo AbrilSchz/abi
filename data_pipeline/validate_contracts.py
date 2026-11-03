@@ -3,7 +3,7 @@
 Validador de contratos de interfaz (Sección 4 de ORQUESTADOR.md) para Marswalk 3D.
 No requiere librerías externas (usa únicamente la biblioteca estándar de Python).
 
-Valida para cada carpeta en data/<dataset_id>/:
+Valida para cada carpeta en public/data/<dataset_id>/:
   - 4.1 metadata.json + binario heightmap.f32 (tamaño exacto rows*cols*4, NaN/Inf, rango de elevación)
   - 4.2 config_fisio.json (gravedad, altura de ojos, velocidades, reserva de O2, tabla slope_cost_factors)
   - 4.3 route.json (opcional: dataset_id, algorithm in {"astar","qaoa"}, path_m, metrics)
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT_DIR / "data"
+DATA_DIR = ROOT_DIR / "public" / "data"
 
 
 class ContractValidationError(Exception):
@@ -179,7 +179,7 @@ def main() -> int:
 
     datasets = sorted([d for d in DATA_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")])
     if not datasets:
-        print("ERROR: No se encontraron datasets en data/", file=sys.stderr)
+        print(f"ERROR: No se encontraron datasets en {DATA_DIR}", file=sys.stderr)
         return 1
 
     print(f"=== Validando contratos de datos en {DATA_DIR} ===")

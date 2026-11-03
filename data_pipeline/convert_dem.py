@@ -2,9 +2,9 @@
 """
 Convierte un DEM GeoTIFF de Marte (o genera un DEM sintético de prueba)
 al formato de contrato de la sección 4.1 de ORQUESTADOR.md:
-  - data/<dataset_id>/metadata.json
-  - data/<dataset_id>/heightmap.f32  (Float32 little-endian, fila por fila, en metros)
-  - data/<dataset_id>/texture.png    (vista previa de 8 bits en escala de grises)
+  - public/data/<dataset_id>/metadata.json
+  - public/data/<dataset_id>/heightmap.f32  (Float32 little-endian, fila por fila, en metros)
+  - public/data/<dataset_id>/texture.png    (vista previa de 8 bits en escala de grises)
 
 Funciona tanto con rasterio/numpy (si están instalados) como con la librería
 estándar de Python para GeoTIFFs Float32 sin comprimir.
@@ -316,20 +316,20 @@ def main():
         "--dataset-id",
         type=str,
         default="jezero_test",
-        help="ID del dataset de salida en data/<dataset_id>/",
+        help="ID del dataset de salida en public/data/<dataset_id>/",
     )
     parser.add_argument(
         "--also-synth",
         action="store_true",
         default=True,
-        help="Generar también data/synth_crater/ para validar cambio de ?dataset=",
+        help="Generar también public/data/synth_crater/ para validar cambio de ?dataset=",
     )
     args = parser.parse_args()
 
     root_dir = Path(__file__).resolve().parent.parent
     dem_path = root_dir / args.dem
     tex_path = root_dir / args.texture if args.texture else None
-    out_dir = root_dir / "data" / args.dataset_id
+    out_dir = root_dir / "public" / "data" / args.dataset_id
 
     if not dem_path.exists():
         raise FileNotFoundError(f"No se encontró el DEM en: {dem_path}")
@@ -354,7 +354,7 @@ def main():
     )
 
     if args.also_synth:
-        synth_dir = root_dir / "data" / "synth_crater"
+        synth_dir = root_dir / "public" / "data" / "synth_crater"
         generate_synthetic_dataset(synth_dir, dataset_id="synth_crater")
 
 
