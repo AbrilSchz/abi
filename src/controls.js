@@ -1,7 +1,7 @@
 /* OrbitControls + PointerLockControls + salto + transiciones + Visor HUD Sci-Fi (T7). */
 
 import * as THREE from 'three';
-import { OrbitControls }       from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
 import { camera, renderer } from './scene.js';
@@ -12,48 +12,48 @@ import { applyHeights, enableLocalPatch, updateLocalPatchIfNeeded, disableLocalP
 import { spawnAstronaut, recallAstronaut } from './astronaut.js';
 import { hideInfoPopup, syncPopupHeight } from './popup.js';
 import { queryAresCopilot, showTransmissionOnHUD, speakCopilotRadio } from './copilot.js';
-
+import { advanceGroupState, aggregateGroupState } from './health_group.js';
 const modeBtn = document.getElementById('mode-btn');
-const hintEl  = document.querySelector('.hint');
+const hintEl = document.querySelector('.hint');
 const hSlider = document.getElementById('h-slider');
-const hValue  = document.getElementById('h-value');
+const hValue = document.getElementById('h-value');
 
 /* Elementos del Visor HUD Sci-Fi (T7) */
-const hudElevEl          = document.getElementById('hud-elev');
-const hudSlopeEl         = document.getElementById('hud-slope');
-const hudSpeedEl         = document.getElementById('hud-speed');
-const hudO2El            = document.getElementById('hud-o2');
-const hudO2PctEl         = document.getElementById('hud-o2-pct');
-const hudO2RateEl        = document.getElementById('hud-o2-rate');
-const hudO2BarEl         = document.getElementById('hud-o2-bar');
-const hudFluxBarEl       = document.getElementById('hud-flux-bar');
-const hudAlertEl         = document.getElementById('hud-slope-alert');
-const hudAlertTextEl     = document.getElementById('hud-alert-text');
-const hudStatusLineEl    = document.getElementById('hud-status-line');
-const hudDatasetTagEl    = document.getElementById('hud-dataset-tag');
-const hudResetO2Btn      = document.getElementById('hud-reset-o2');
-const hudTimerEl         = document.getElementById('hud-timer');
-const hudCompassTrackEl  = document.getElementById('hud-compass-track');
+const hudElevEl = document.getElementById('hud-elev');
+const hudSlopeEl = document.getElementById('hud-slope');
+const hudSpeedEl = document.getElementById('hud-speed');
+const hudO2El = document.getElementById('hud-o2');
+const hudO2PctEl = document.getElementById('hud-o2-pct');
+const hudO2RateEl = document.getElementById('hud-o2-rate');
+const hudO2BarEl = document.getElementById('hud-o2-bar');
+const hudFluxBarEl = document.getElementById('hud-flux-bar');
+const hudAlertEl = document.getElementById('hud-slope-alert');
+const hudAlertTextEl = document.getElementById('hud-alert-text');
+const hudStatusLineEl = document.getElementById('hud-status-line');
+const hudDatasetTagEl = document.getElementById('hud-dataset-tag');
+const hudResetO2Btn = document.getElementById('hud-reset-o2');
+const hudTimerEl = document.getElementById('hud-timer');
+const hudCompassTrackEl = document.getElementById('hud-compass-track');
 const reticleSlopeFillEl = document.getElementById('reticle-slope-fill');
-const reticleSegsEl      = document.getElementById('reticle-segments');
-const badgeWalkEl        = document.getElementById('badge-walk');
-const badgeRunEl         = document.getElementById('badge-run');
-const badgeSlopeEl       = document.getElementById('badge-slope');
-const badgeO2El          = document.getElementById('badge-o2');
-const minimapCanvas      = document.getElementById('hud-minimap');
-const minimapCtx         = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+const reticleSegsEl = document.getElementById('reticle-segments');
+const badgeWalkEl = document.getElementById('badge-walk');
+const badgeRunEl = document.getElementById('badge-run');
+const badgeSlopeEl = document.getElementById('badge-slope');
+const badgeO2El = document.getElementById('badge-o2');
+const minimapCanvas = document.getElementById('hud-minimap');
+const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
 
 /* Elementos de Ciencia Interactiva en 1ª Persona y Bitácora EVA (E3) */
-const hudSciCountEl      = document.getElementById('hud-sci-count');
-const hudSciListEl       = document.getElementById('hud-sci-list');
-const hudInteractEl      = document.getElementById('hud-interact-prompt');
-const hudInteractTextEl  = document.getElementById('hud-interact-text');
-const hudToastEl         = document.getElementById('hud-science-toast');
-const hudToastTitleEl    = document.getElementById('hud-toast-title');
+const hudSciCountEl = document.getElementById('hud-sci-count');
+const hudSciListEl = document.getElementById('hud-sci-list');
+const hudInteractEl = document.getElementById('hud-interact-prompt');
+const hudInteractTextEl = document.getElementById('hud-interact-text');
+const hudToastEl = document.getElementById('hud-science-toast');
+const hudToastTitleEl = document.getElementById('hud-toast-title');
 const hudToastSpectrumEl = document.getElementById('hud-toast-spectrum');
-const hudToastDescEl     = document.getElementById('hud-toast-desc');
-const hudToastSourceEl   = document.getElementById('hud-toast-source');
-let toastTimeoutId       = null;
+const hudToastDescEl = document.getElementById('hud-toast-desc');
+const hudToastSourceEl = document.getElementById('hud-toast-source');
+let toastTimeoutId = null;
 
 /* Estado interno del salto y misión */
 let vy = 0;
@@ -62,9 +62,9 @@ let evaElapsed_s = 0;
 let minimapFrameCounter = 0;
 
 /* Temporales */
-const _fwd     = new THREE.Vector3();
-const _right   = new THREE.Vector3();
-const _move    = new THREE.Vector3();
+const _fwd = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _move = new THREE.Vector3();
 const _lookDir = new THREE.Vector3();
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
@@ -73,19 +73,19 @@ export function initControls() {
   /* Orbit */
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.target.set(0, 0, 0);
-  orbit.enableDamping      = true;
-  orbit.dampingFactor      = 0.08;
-  orbit.enableRotate       = false;
-  orbit.enablePan          = true;
+  orbit.enableDamping = true;
+  orbit.dampingFactor = 0.08;
+  orbit.enableRotate = false;
+  orbit.enablePan = true;
   orbit.screenSpacePanning = true;
-  orbit.minDistance        = 30;
-  orbit.maxDistance        = 600;
-  orbit.minPolarAngle      = 0;
-  orbit.maxPolarAngle      = Math.PI;
+  orbit.minDistance = 30;
+  orbit.maxDistance = 600;
+  orbit.minPolarAngle = 0;
+  orbit.maxPolarAngle = Math.PI;
   orbit.mouseButtons = {
-    LEFT:   THREE.MOUSE.PAN,
+    LEFT: THREE.MOUSE.PAN,
     MIDDLE: THREE.MOUSE.DOLLY,
-    RIGHT:  null
+    RIGHT: null
   };
   orbit.update();
   state.orbitControls = orbit;
@@ -96,7 +96,7 @@ export function initControls() {
   const fp = new PointerLockControls(camera, renderer.domElement);
   state.fpControls = fp;
 
-  fp.addEventListener('lock',   () => document.body.classList.add('fp'));
+  fp.addEventListener('lock', () => document.body.classList.add('fp'));
   fp.addEventListener('unlock', () => { if (state.mode === 'fp') leaveFirstPerson(); });
 
   /* Botón modo */
@@ -135,7 +135,7 @@ export function initControls() {
   /* Teclado */
   window.addEventListener('keydown', (e) => {
     if (state.mode === 'fp') {
-      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
         e.preventDefault();
       }
       if (e.code === 'KeyE' && !e.repeat) {
@@ -155,12 +155,12 @@ export function initControls() {
     keys.add(e.code);
   });
   window.addEventListener('keyup', (e) => keys.delete(e.code));
-  window.addEventListener('blur',  () => keys.clear());
+  window.addEventListener('blur', () => keys.clear());
 
   async function triggerCopilotRadioComms() {
-    const isStorm   = state.weather?.mode === 'dust_storm';
+    const isStorm = state.weather?.mode === 'dust_storm';
     const slopeWarn = (state.hud?.slope_deg ?? 0) > (state.fisio?.max_safe_slope_deg || 25);
-    const o2Pct     = Math.round(((state.hud?.o2Remaining_l ?? 580) / (state.fisio?.o2_reserve_l || 580)) * 100);
+    const o2Pct = Math.round(((state.hud?.o2Remaining_l ?? 580) / (state.fisio?.o2_reserve_l || 580)) * 100);
 
     let query = 'Reporte de situación general y seguridad de misión';
     if (isStorm) query = 'Alerta de tormenta de polvo: ¿cuál es el protocolo de evacuación urgente?';
@@ -266,12 +266,12 @@ export function leaveFirstPerson() {
 
   state.transition = {
     t: 0, duration: 0.8,
-    fromPos:    camera.position.clone(),
-    toPos:      camEnd,
+    fromPos: camera.position.clone(),
+    toPos: camEnd,
     fromTarget: state.orbitControls.target.clone(),
-    toTarget:   target,
-    fromUp:     camera.up.clone(),
-    toUp:       new THREE.Vector3(0, 0, -1),
+    toTarget: target,
+    fromUp: camera.up.clone(),
+    toUp: new THREE.Vector3(0, 0, -1),
   };
   state.orbitControls.enabled = false;
 
@@ -295,8 +295,8 @@ export function updateControls(dt) {
 }
 
 function updateFirstPerson(dt) {
-  const prevX_m    = camera.position.x;
-  const prevZ_m    = camera.position.z;
+  const prevX_m = camera.position.x;
+  const prevZ_m = camera.position.z;
   const prevElev_m = sampleDemHeightRelM(prevX_m, prevZ_m) ?? 0;
 
   /* --- Salto (m/s y m/s²) --- */
@@ -314,20 +314,20 @@ function updateFirstPerson(dt) {
 
   /* --- Movimiento horizontal (m/s) --- */
   let forwardInput = 0, strafeInput = 0;
-  if (keys.has('KeyW') || keys.has('ArrowUp'))    forwardInput += 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown'))  forwardInput -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) strafeInput  += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft'))  strafeInput  -= 1;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) forwardInput += 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) forwardInput -= 1;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) strafeInput += 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) strafeInput -= 1;
 
-  const running  = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  const canMove  = state.hud.o2Remaining_l > 0;
+  const running = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  const canMove = state.hud.o2Remaining_l > 0;
   const speed_ms = canMove
     ? (running ? state.fisio.run_speed_ms : state.fisio.walk_speed_ms)
     : 0;
 
   _move.set(0, 0, 0)
-       .addScaledVector(_fwd, forwardInput)
-       .addScaledVector(_right, strafeInput);
+    .addScaledVector(_fwd, forwardInput)
+    .addScaledVector(_right, strafeInput);
 
   if (_move.lengthSq() > 0 && speed_ms > 0) {
     _move.normalize().multiplyScalar(speed_ms * dt);
@@ -377,37 +377,49 @@ function updateFirstPerson(dt) {
   }
 
   /* --- Telemetría y consumo de oxígeno en 1ª persona (T7) --- */
-  const curX_m    = camera.position.x;
-  const curZ_m    = camera.position.z;
+  const curX_m = camera.position.x;
+  const curZ_m = camera.position.z;
   const curElev_m = sampleDemHeightRelM(curX_m, curZ_m) ?? 0;
   const minElev_m = state.metadata ? state.metadata.elevation_range_m[0] : 0;
 
-  const stepDist_m  = Math.hypot(curX_m - prevX_m, curZ_m - prevZ_m);
+  const stepDist_m = Math.hypot(curX_m - prevX_m, curZ_m - prevZ_m);
   const actualSpeed = dt > 1e-5 ? stepDist_m / dt : 0;
   const deltaElev_m = curElev_m - prevElev_m;
-  const slope_deg   = sampleSlopeDeg(curX_m, curZ_m);
-
+  const slope_deg = sampleSlopeDeg(curX_m, curZ_m);
+  /* --- Fase G1: avanzar estado de salud del grupo/solo --- */
+  if (state.health) {
+    const isMoving = stepDist_m > 0.01;
+    const segment = {
+      walking_time_h: dt / 3600,
+      slope_deg: isMoving ? slope_deg : 0,
+      delta_elev_m: isMoving ? deltaElev_m : 0,
+      surface_distance_m: isMoving ? stepDist_m : 0,
+      walk_speed_ms: isMoving ? actualSpeed : 0,
+    };
+    state.health = advanceGroupState(state.health, segment);
+    state.healthLastAggregate = aggregateGroupState(state.health);
+  }
   /* Si está en movimiento: calcular pendiente direccional efectiva del paso + pendiente del terreno */
   const isMoving = stepDist_m > 1e-4;
   const baseRate_l_h = state.fisio.o2_base_consumption_l_per_h;
-  const thermalMult  = state.weather?.thermalPenalty || 1.0;
+  const thermalMult = state.weather?.thermalPenalty || 1.0;
   let o2Rate_l_h = baseRate_l_h * 0.45 * thermalMult; // tasa basal en reposo de pie (~22.5 L/h)
 
   if (isMoving) {
     const slopeFactor = getSlopeCostFactor(slope_deg, deltaElev_m);
-    const effortMult  = running ? 2.2 : 1.0;
-    const climbGrade  = stepDist_m > 0 ? deltaElev_m / stepDist_m : 0;
-    const climbBonus  = climbGrade > 0 ? 1.0 + climbGrade * 4.5 : Math.max(0.8, 1.0 + climbGrade * 0.8);
+    const effortMult = running ? 2.2 : 1.0;
+    const climbGrade = stepDist_m > 0 ? deltaElev_m / stepDist_m : 0;
+    const climbBonus = climbGrade > 0 ? 1.0 + climbGrade * 4.5 : Math.max(0.8, 1.0 + climbGrade * 0.8);
     o2Rate_l_h = baseRate_l_h * effortMult * slopeFactor * climbBonus * thermalMult;
   }
 
   const consumed_l = (o2Rate_l_h / 3600) * dt;
   state.hud.o2Remaining_l = Math.max(0, state.hud.o2Remaining_l - consumed_l);
-  state.hud.elev_m        = minElev_m + curElev_m;
-  state.hud.slope_deg     = slope_deg;
-  state.hud.speed_ms      = actualSpeed;
-  state.hud.o2Rate_l_h    = o2Rate_l_h;
-  state.hud.slopeWarning  = slope_deg > state.fisio.max_safe_slope_deg;
+  state.hud.elev_m = minElev_m + curElev_m;
+  state.hud.slope_deg = slope_deg;
+  state.hud.speed_ms = actualSpeed;
+  state.hud.o2Rate_l_h = o2Rate_l_h;
+  state.hud.slopeWarning = slope_deg > state.fisio.max_safe_slope_deg;
 }
 
 function updateOrbitalTelemetry() {
@@ -418,10 +430,10 @@ function updateOrbitalTelemetry() {
   const relElev_m = sampleDemHeightRelM(px, pz) ?? 0;
   const slope_deg = sampleSlopeDeg(px, pz);
 
-  state.hud.elev_m       = minElev_m + relElev_m;
-  state.hud.slope_deg    = slope_deg;
-  state.hud.speed_ms     = 0;
-  state.hud.o2Rate_l_h   = 0;
+  state.hud.elev_m = minElev_m + relElev_m;
+  state.hud.slope_deg = slope_deg;
+  state.hud.speed_ms = 0;
+  state.hud.o2Rate_l_h = 0;
   state.hud.slopeWarning = slope_deg > state.fisio.max_safe_slope_deg;
 }
 
@@ -445,12 +457,12 @@ function renderHUD() {
   const maxSafe = state.fisio.max_safe_slope_deg || 25;
 
   /* Cajas inferiores derechas y barras inferiores izquierdas */
-  hudElevEl.textContent   = `${h.elev_m.toFixed(0)} m`;
-  hudSlopeEl.textContent  = `${h.slope_deg.toFixed(1)}°`;
-  hudSlopeEl.style.color  = h.slopeWarning ? '#ff3855' : '';
+  hudElevEl.textContent = `${h.elev_m.toFixed(0)} m`;
+  hudSlopeEl.textContent = `${h.slope_deg.toFixed(1)}°`;
+  hudSlopeEl.style.color = h.slopeWarning ? '#ff3855' : '';
   if (hudO2PctEl) hudO2PctEl.textContent = `${pct.toFixed(0)}%`;
-  hudSpeedEl.textContent  = `${h.speed_ms.toFixed(1)} m/s`;
-  hudO2El.textContent     = `${h.o2Remaining_l.toFixed(1)} L`;
+  hudSpeedEl.textContent = `${h.speed_ms.toFixed(1)} m/s`;
+  hudO2El.textContent = `${h.o2Remaining_l.toFixed(1)} L`;
   hudO2RateEl.textContent = `${h.o2Rate_l_h.toFixed(1)} L/h`;
 
   if (hudTimerEl) {
@@ -489,8 +501,8 @@ function renderHUD() {
 
   /* Badges de estado inferiores */
   const isRunning = h.speed_ms > state.fisio.walk_speed_ms * 1.25;
-  if (badgeWalkEl)  badgeWalkEl.classList.toggle('active', h.speed_ms > 0.05);
-  if (badgeRunEl)   badgeRunEl.classList.toggle('active', isRunning);
+  if (badgeWalkEl) badgeWalkEl.classList.toggle('active', h.speed_ms > 0.05);
+  if (badgeRunEl) badgeRunEl.classList.toggle('active', isRunning);
   if (badgeSlopeEl) {
     badgeSlopeEl.classList.toggle('active', !h.slopeWarning && h.slope_deg > 8);
     badgeSlopeEl.classList.toggle('danger', h.slopeWarning);
@@ -502,7 +514,7 @@ function renderHUD() {
 
   /* Alerta superior izquierda // MALFUNCTIONS */
   const o2Critical = pct <= 15;
-  const isStorm    = state.weather?.mode === 'dust_storm';
+  const isStorm = state.weather?.mode === 'dust_storm';
   if (hudAlertEl && hudAlertTextEl) {
     if (h.slopeWarning) {
       hudAlertEl.hidden = false;
@@ -538,6 +550,7 @@ function renderHUD() {
 
   /* Actualizar proximidad a Rovers / POIs y bitácora científica en 1ª persona (E3) */
   updateProximityScienceHUD();
+  renderGroupHUD();
 }
 
 function updateProximityScienceHUD() {
@@ -628,10 +641,10 @@ function triggerFirstPersonScienceInteraction() {
   /* Mostrar tarjeta de telemetría científica en el visor durante 6 segundos */
   if (hudToastEl) {
     hudToastEl.hidden = false;
-    if (hudToastTitleEl)    hudToastTitleEl.textContent    = `✓ ${poi.name.toUpperCase()}`;
+    if (hudToastTitleEl) hudToastTitleEl.textContent = `✓ ${poi.name.toUpperCase()}`;
     if (hudToastSpectrumEl) hudToastSpectrumEl.textContent = spectrumLine;
-    if (hudToastDescEl)     hudToastDescEl.textContent     = poi.description || '';
-    if (hudToastSourceEl)   hudToastSourceEl.textContent   = `Misión / Instrumento: ${poi.source || 'NASA Multi-Mission'}`;
+    if (hudToastDescEl) hudToastDescEl.textContent = poi.description || '';
+    if (hudToastSourceEl) hudToastSourceEl.textContent = `Misión / Instrumento: ${poi.source || 'NASA Multi-Mission'}`;
 
     if (toastTimeoutId) clearTimeout(toastTimeoutId);
     toastTimeoutId = setTimeout(() => {
@@ -734,8 +747,8 @@ function drawHudMinimap(yawRad) {
       minimapCtx.fillStyle = poi.type === 'hazard'
         ? '#ff3855'
         : poi.type === 'shelter'
-        ? '#55f29b'
-        : '#66fcf1';
+          ? '#55f29b'
+          : '#66fcf1';
       minimapCtx.beginPath();
       minimapCtx.arc(mx, my, 3, 0, Math.PI * 2);
       minimapCtx.fill();
@@ -791,8 +804,43 @@ function updateTransition(dt) {
 function updateUI() {
   const isFP = state.mode === 'fp';
   modeBtn.textContent = isFP ? 'Volver a Vista Orbital' : 'Explorar (1ª Persona)';
-  hintEl.textContent  = isFP
+  hintEl.textContent = isFP
     ? 'WASD = Moverse · Shift = Correr · Space = Saltar · Ratón = Mirar · ESC = Salir'
     : 'Arrastra = Mover mapa · Rueda = Zoom · Clic = Info · Arrastra el astronauta al mapa';
   document.body.classList.toggle('fp', isFP);
+}
+function renderGroupHUD() {
+  const nowMs = performance.now();
+  if (nowMs - (renderGroupHUD._lastMs || 0) < 200) return;
+  renderGroupHUD._lastMs = nowMs;
+
+  const panel = document.getElementById('group-status-panel');
+  const listEl = document.getElementById('group-members-list');
+  const metaEl = document.getElementById('group-status-meta');
+  if (!panel || !listEl || !metaEl) return;
+
+  if (state.mode !== 'fp' || !state.healthLastAggregate) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+
+  const agg = state.healthLastAggregate;
+  const leaderIdx = agg.leaderIndex;
+  const modeLabel = agg.mode === 'solo' ? 'SOLO' : `GROUP · ${agg.members.length} · ROT ${agg.totalRotations}`;
+  metaEl.textContent = `${modeLabel} · leader: ${agg.leaderId ?? '—'}`;
+
+  listEl.innerHTML = agg.members.map((m, idx) => {
+    const isLeader = idx === leaderIdx;
+    const statusClass =
+      m.flags.o2_depleted || m.flags.over_sustainable_metabolic ? 'critical'
+        : m.flags.hr_above_85pct_max || m.flags.o2_low ? 'warn'
+          : 'nominal';
+    const roleTag = m.role === 'leader' ? 'L' : m.role === 'follower' ? 'F' : '·';
+    return `<div class="group-member ${statusClass}">
+      <span class="member-role">${roleTag}</span>
+      <span class="member-id">${m.id}</span>
+      <span class="member-metric">O₂ ${m.o2_remaining_l.toFixed(0)}L · ${m.heart_rate_bpm.toFixed(0)}bpm · ${m.metabolic_rate_w.toFixed(0)}W</span>
+    </div>`;
+  }).join('');
 }
