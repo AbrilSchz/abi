@@ -11,6 +11,35 @@ import { benchmarkGroundSampling } from './raycast.js';
 import { initIntroCinematic, initRealtimeDemLoader } from './cinematic.js';
 import { tickArtifactsAnimation } from './artifacts3d.js';
 import { initCopilotUI } from './copilot.js';
+import { createSoloHealth, createGroupHealth, loadHealthModePreference } from './health_group.js';
+
+async function loadConfigHealth(datasetId) {
+  try {
+    const res = await fetch(`data/${datasetId}/config_health.json`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) {
+    return null;
+  }
+}
+
+async function initHealthState() {
+  const mode = loadHealthModePreference();
+  const raw = await loadConfigHealth(state.datasetId || 'jezero_test');
+  const cfgOverrides = raw ? { ...raw } : {};
+  delete cfgOverrides.members;
+  delete cfgOverrides.dataset_id;
+  delete cfgOverrides.note;
+
+  if (mode === 'group' && raw?.members) {
+    state.health = createGroupHealth(raw.members, cfgOverrides);
+  } else {
+    state.health = createSoloHealth(cfgOverrides);
+  }
+  state.healthMode = state.health.mode;
+  console.log('[MarsWalk] Health inicializado:', state.health.mode, state.health.members.length, 'miembro(s)');
+}
+
 
 const clock = new THREE.Clock();
 
@@ -21,7 +50,7 @@ const clock = new THREE.Clock();
   /* 2. Cargar terreno */
   await loadHeightmap();
   benchmarkGroundSampling(200);
-
+  initHealthState();
   /* 3. Inicializar astronauta (dock + drag) */
   initAstronaut();
 

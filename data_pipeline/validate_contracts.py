@@ -172,7 +172,7 @@ def validate_poi_if_present(ds_dir: Path, ds_id: str, meta: dict):
     return len(points)
 
 
-def main() -> int:
+def main() -> int:https://github.com/RoshTzsche/MarsWalk
     if not DATA_DIR.is_dir():
         print(f"ERROR: No existe el directorio {DATA_DIR}", file=sys.stderr)
         return 1

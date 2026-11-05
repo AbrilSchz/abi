@@ -1,0 +1,8 @@
+{
+    "dataset_id": "synth_crater",
+        "note": "Dataset sintético de validación: astronauta solo con defaults.",
+            "body_mass_kg": 80,
+                "suit_mass_kg": 60,
+                    "terrain_factor": 1.1,
+                        "group_size": 1
+}
