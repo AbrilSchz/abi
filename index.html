@@ -4,16 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Marswalk · Explorador 3D</title>
-  <link rel="stylesheet" href="styles.css" />
-
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
-    }
-  }
-  </script>
 </head>
 <body>
 
@@ -27,7 +17,6 @@
 
   <!-- HUD compacto en vista orbital + Visor Sci-Fi completo en 1ª persona (estilo HUD_IDEA.jpeg) -->
   <div id="eva-hud" class="eva-hud" aria-label="Telemetría EVA (HUD)">
-    <!-- Arriba izquierda: // MALFUNCTIONS y alertas de terreno -->
     <div class="hud-top-left">
       <div class="hud-tag">// EVA_STATUS · PLSS</div>
       <div id="hud-slope-alert" class="hud-malfunction-box" role="alert" aria-live="polite" hidden>
@@ -42,7 +31,6 @@
       <div id="hud-env-line" class="hud-env-line">
         MEDA // -63°C · 7.4 hPa · VIENTO 5.2 m/s · τ=0.45 [T = Tormenta]
       </div>
-      <!-- Bitácora de objetivos científicos EVA (solo en 1ª persona, E3) -->
       <div id="hud-science-log" class="hud-science-log">
         <div class="hud-sci-header">
           <span>// BITÁCORA CIENCIA EVA</span>
@@ -52,7 +40,6 @@
       </div>
     </div>
 
-    <!-- Centro (solo 1ª persona): Retícula sci-fi + barra superior + segmentos inferiores -->
     <div class="hud-center-reticle" aria-hidden="true">
       <div class="reticle-top-bar">
         <span class="reticle-label">// PENDIENTE LOCAL</span>
@@ -63,13 +50,10 @@
 
       <div class="reticle-brackets">
         <svg viewBox="0 0 220 140" class="reticle-svg">
-          <!-- Arcos exteriores tenues -->
           <path d="M 38 25 A 75 75 0 0 0 38 115" fill="none" stroke="rgba(102, 252, 241, 0.28)" stroke-width="1.5" stroke-dasharray="5 4"/>
           <path d="M 182 25 A 75 75 0 0 1 182 115" fill="none" stroke="rgba(102, 252, 241, 0.28)" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <!-- Brackets internos -->
           <path d="M 78 36 L 64 36 L 64 104 L 78 104" fill="none" stroke="rgba(102, 252, 241, 0.65)" stroke-width="1.6"/>
           <path d="M 142 36 L 156 36 L 156 104 L 142 104" fill="none" stroke="rgba(102, 252, 241, 0.65)" stroke-width="1.6"/>
-          <!-- Mirilla central cuadrada -->
           <path d="M 105 64 L 102 64 L 102 67 M 115 64 L 118 64 L 118 67 M 105 76 L 102 76 L 102 73 M 115 76 L 118 76 L 118 73" fill="none" stroke="#66fcf1" stroke-width="1.6"/>
           <circle cx="110" cy="70" r="1.5" fill="#66fcf1"/>
         </svg>
@@ -80,13 +64,11 @@
         <span></span><span></span><span></span><span></span><span></span><span></span>
       </div>
 
-      <!-- Prompt interactivo por proximidad a Rover / Hábitat / POI en 1ª persona (E3) -->
       <div id="hud-interact-prompt" class="hud-interact-prompt" hidden>
         <span class="key-badge">E</span>
         <span id="hud-interact-text">ANALIZAR MUESTRA / CONECTAR CON ROVER</span>
       </div>
 
-      <!-- Tarjeta de resultado espectrométrico / telemetría de misión al pulsar [E] (E3) -->
       <div id="hud-science-toast" class="hud-science-toast" hidden>
         <div id="hud-toast-title" class="hud-toast-title">ANÁLISIS COMPLETADO</div>
         <div id="hud-toast-spectrum" class="hud-toast-spectrum"></div>
@@ -94,7 +76,6 @@
         <div id="hud-toast-source" class="hud-toast-source"></div>
       </div>
 
-      <!-- Transmisión de radio del Copiloto ARES-AI (E6 - Tecla C) -->
       <div id="hud-radio-toast" class="hud-radio-toast hidden">
         <div class="hud-radio-header">
           <span class="hud-radio-dot">●</span>
@@ -105,7 +86,6 @@
       </div>
     </div>
 
-    <!-- Abajo izquierda: Barras de Oxígeno (O₂) y flujo metabólico -->
     <div class="hud-bottom-left">
       <div class="hud-o2-wrap">
         <span class="hud-vert-label">O2_RES</span>
@@ -133,7 +113,6 @@
       </div>
     </div>
 
-    <!-- Abajo centro (solo 1ª persona): Pulso metabólico + Velocidad + Iconos de estado -->
     <div class="hud-bottom-center" aria-hidden="true">
       <div class="hud-ecg-row">
         <span class="hud-vert-tiny">MET</span>
@@ -153,7 +132,6 @@
       </div>
     </div>
 
-    <!-- Abajo derecha: Cronómetro EVA + Cajas de telemetría + Mini-radar con brújula -->
     <div class="hud-bottom-right">
       <div class="hud-timer-box">
         <span id="hud-timer">00:00:00.0</span>
@@ -274,7 +252,6 @@
       </button>
     </div>
 
-    <!-- Copiloto de Misión EVA ARES-AI (E6 - Meta Llama 3) -->
     <div class="layers-header route-header copilot-title-row">
       <span>🎙️ Copiloto ARES-AI (Llama 3)</span>
       <div class="copilot-hdr-btns">
@@ -376,7 +353,6 @@
     </button>
   </div>
 
-  <!-- Cinemática Inicial Narrativa: De la Tierra a Marte (E1) -->
   <div id="intro-cinematic" class="intro-cinematic hidden" role="dialog" aria-label="Cinemática de misión Tierra a Marte">
     <canvas id="cinematic-canvas"></canvas>
     <div class="cinematic-hud">
@@ -408,7 +384,6 @@
     </div>
   </div>
 
-  <!-- Modal de Configuración de API Key para Llama / Groq -->
   <div id="copilot-modal" class="copilot-modal hidden" role="dialog" aria-label="Configuración de ARES-AI">
     <div class="copilot-modal-card">
       <div class="copilot-modal-header">
@@ -455,6 +430,6 @@
       }
     });
   </script>
-  <script type="module" src="main.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

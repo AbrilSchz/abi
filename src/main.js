@@ -1,5 +1,5 @@
 /* Entry point: arranca la app y orquesta el bucle. */
-
+import './styles.css';
 import * as THREE from 'three';
 import { state } from './state.js';
 import { renderer, scene, camera, stars } from './scene.js';
