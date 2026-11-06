@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,6 +16,7 @@
   }
   </script>
 </head>
+
 <body>
 
   <div id="app"></div>
@@ -64,14 +66,20 @@
       <div class="reticle-brackets">
         <svg viewBox="0 0 220 140" class="reticle-svg">
           <!-- Arcos exteriores tenues -->
-          <path d="M 38 25 A 75 75 0 0 0 38 115" fill="none" stroke="rgba(102, 252, 241, 0.28)" stroke-width="1.5" stroke-dasharray="5 4"/>
-          <path d="M 182 25 A 75 75 0 0 1 182 115" fill="none" stroke="rgba(102, 252, 241, 0.28)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <path d="M 38 25 A 75 75 0 0 0 38 115" fill="none" stroke="rgba(102, 252, 241, 0.28)" stroke-width="1.5"
+            stroke-dasharray="5 4" />
+          <path d="M 182 25 A 75 75 0 0 1 182 115" fill="none" stroke="rgba(102, 252, 241, 0.28)" stroke-width="1.5"
+            stroke-dasharray="5 4" />
           <!-- Brackets internos -->
-          <path d="M 78 36 L 64 36 L 64 104 L 78 104" fill="none" stroke="rgba(102, 252, 241, 0.65)" stroke-width="1.6"/>
-          <path d="M 142 36 L 156 36 L 156 104 L 142 104" fill="none" stroke="rgba(102, 252, 241, 0.65)" stroke-width="1.6"/>
+          <path d="M 78 36 L 64 36 L 64 104 L 78 104" fill="none" stroke="rgba(102, 252, 241, 0.65)"
+            stroke-width="1.6" />
+          <path d="M 142 36 L 156 36 L 156 104 L 142 104" fill="none" stroke="rgba(102, 252, 241, 0.65)"
+            stroke-width="1.6" />
           <!-- Mirilla central cuadrada -->
-          <path d="M 105 64 L 102 64 L 102 67 M 115 64 L 118 64 L 118 67 M 105 76 L 102 76 L 102 73 M 115 76 L 118 76 L 118 73" fill="none" stroke="#66fcf1" stroke-width="1.6"/>
-          <circle cx="110" cy="70" r="1.5" fill="#66fcf1"/>
+          <path
+            d="M 105 64 L 102 64 L 102 67 M 115 64 L 118 64 L 118 67 M 105 76 L 102 76 L 102 73 M 115 76 L 118 76 L 118 73"
+            fill="none" stroke="#66fcf1" stroke-width="1.6" />
+          <circle cx="110" cy="70" r="1.5" fill="#66fcf1" />
         </svg>
       </div>
 
@@ -138,7 +146,8 @@
       <div class="hud-ecg-row">
         <span class="hud-vert-tiny">MET</span>
         <svg viewBox="0 0 180 28" class="hud-ecg-svg">
-          <path d="M 0 16 L 68 16 L 76 16 L 81 6 L 87 25 L 93 2 L 99 22 L 104 12 L 109 16 L 180 16" fill="none" stroke="#f6c945" stroke-width="1.8"/>
+          <path d="M 0 16 L 68 16 L 76 16 L 81 6 L 87 25 L 93 2 L 99 22 L 104 12 L 109 16 L 180 16" fill="none"
+            stroke="#f6c945" stroke-width="1.8" />
         </svg>
       </div>
       <div class="hud-speed-readout">
@@ -212,10 +221,12 @@
       </select>
     </div>
     <div class="realtime-dem-row">
-      <button id="upload-dem-btn" class="route-btn secondary" type="button" title="Cargar archivo GeoTIFF (.tif) o binario (.f32) en tiempo real">
+      <button id="upload-dem-btn" class="route-btn secondary" type="button"
+        title="Cargar archivo GeoTIFF (.tif) o binario (.f32) en tiempo real">
         📂 Cargar DEM (.tif/.f32)
       </button>
-      <button id="replay-cinematic-btn" class="route-btn secondary" type="button" title="Reproducir cinemática narrativa Tierra -> Marte">
+      <button id="replay-cinematic-btn" class="route-btn secondary" type="button"
+        title="Reproducir cinemática narrativa Tierra -> Marte">
         🎬 Intro
       </button>
       <input id="upload-dem-input" type="file" accept=".tif,.tiff,.f32" hidden />
@@ -240,7 +251,8 @@
           <label for="solar-ltst-slider">Hora Solar (LTST)</label>
           <div class="solar-ltst-right">
             <span id="solar-ltst-val" class="solar-val-mono">10:30</span>
-            <button id="solar-cycle-btn" class="solar-mini-btn" type="button" title="Animar ciclo diurno marciano en tiempo real">▶</button>
+            <button id="solar-cycle-btn" class="solar-mini-btn" type="button"
+              title="Animar ciclo diurno marciano en tiempo real">▶</button>
           </div>
         </div>
         <input id="solar-ltst-slider" type="range" min="0" max="24" step="0.1" value="10.5" />
@@ -249,7 +261,8 @@
         <div class="solar-slider-top">
           <label for="solar-ls-select">Órbita (Ls / Dist. Sol)</label>
         </div>
-        <select id="solar-ls-select" class="dataset-select solar-select" title="Longitud solar areocéntrica Ls (determina distancia Marte-Sol r en AU y declinación δ)">
+        <select id="solar-ls-select" class="dataset-select solar-select"
+          title="Longitud solar areocéntrica Ls (determina distancia Marte-Sol r en AU y declinación δ)">
           <option value="142">Ls 142° · Nominal Jezero (1.56 AU)</option>
           <option value="251">Ls 251° · Perihelio Máx. Sol (1.38 AU)</option>
           <option value="71">Ls 71° · Afelio Mín. Sol (1.67 AU)</option>
@@ -258,18 +271,25 @@
       </div>
     </div>
     <dl class="weather-metrics">
-      <dt>Dist. Sol (r)</dt>  <dd id="wm-dist-au">1.564 AU</dd>
-      <dt>Irrad. Sup.</dt>    <dd id="wm-irrad">412 W/m²</dd>
-      <dt>Sol (El/Az)</dt>    <dd id="wm-sun-ang">66° / 112°</dd>
-      <dt>Temp. Sup.</dt>     <dd id="wm-temp">-63 °C</dd>
-      <dt>Viento</dt>         <dd id="wm-wind">5.2 m/s</dd>
-      <dt>Polvo (τ)</dt>      <dd id="wm-tau">τ = 0.45</dd>
+      <dt>Dist. Sol (r)</dt>
+      <dd id="wm-dist-au">1.564 AU</dd>
+      <dt>Irrad. Sup.</dt>
+      <dd id="wm-irrad">412 W/m²</dd>
+      <dt>Sol (El/Az)</dt>
+      <dd id="wm-sun-ang">66° / 112°</dd>
+      <dt>Temp. Sup.</dt>
+      <dd id="wm-temp">-63 °C</dd>
+      <dt>Viento</dt>
+      <dd id="wm-wind">5.2 m/s</dd>
+      <dt>Polvo (τ)</dt>
+      <dd id="wm-tau">τ = 0.45</dd>
     </dl>
     <div class="weather-actions">
       <button id="weather-storm-btn" class="route-btn storm" type="button">
         🌪️ Simular Tormenta de Polvo (MEDA)
       </button>
-      <button id="weather-evac-btn" class="route-btn secondary evac" type="button" title="Trazar ruta de evacuación desde el astronauta al Refugio más cercano">
+      <button id="weather-evac-btn" class="route-btn secondary evac" type="button"
+        title="Trazar ruta de evacuación desde el astronauta al Refugio más cercano">
         🚨 Evacuar a Refugio
       </button>
     </div>
@@ -278,21 +298,29 @@
     <div class="layers-header route-header copilot-title-row">
       <span>🎙️ Copiloto ARES-AI (Llama 3)</span>
       <div class="copilot-hdr-btns">
-        <button id="copilot-voice-btn" class="copilot-mini-btn" type="button" title="Activar/desactivar audio de radio">🔇 Voz</button>
-        <button id="copilot-settings-btn" class="copilot-mini-btn" type="button" title="Configurar API Key de Groq/Llama">⚙️ API</button>
+        <button id="copilot-voice-btn" class="copilot-mini-btn" type="button"
+          title="Activar/desactivar audio de radio">🔇 Voz</button>
+        <button id="copilot-settings-btn" class="copilot-mini-btn" type="button"
+          title="Configurar API Key de Groq/Llama">⚙️ API</button>
       </div>
     </div>
     <div class="copilot-chat-wrap">
       <div id="copilot-messages" class="copilot-messages"></div>
       <div class="copilot-quick-pills">
-        <button class="copilot-quick-btn" type="button" data-prompt="¿Es seguro continuar la caminata en este momento?">🚨 ¿Seguro?</button>
-        <button class="copilot-quick-btn" type="button" data-prompt="¿Cuál es el siguiente objetivo científico prioritario?">🔬 Siguiente POI</button>
-        <button class="copilot-quick-btn" type="button" data-prompt="Evalúa la viabilidad de la ruta activa A* / QAOA">🗺️ Ruta</button>
-        <button class="copilot-quick-btn" type="button" data-prompt="Dame un reporte meteorológico y de polvo MEDA">📡 Clima</button>
+        <button class="copilot-quick-btn" type="button"
+          data-prompt="¿Es seguro continuar la caminata en este momento?">🚨 ¿Seguro?</button>
+        <button class="copilot-quick-btn" type="button"
+          data-prompt="¿Cuál es el siguiente objetivo científico prioritario?">🔬 Siguiente POI</button>
+        <button class="copilot-quick-btn" type="button"
+          data-prompt="Evalúa la viabilidad de la ruta activa A* / QAOA">🗺️ Ruta</button>
+        <button class="copilot-quick-btn" type="button" data-prompt="Dame un reporte meteorológico y de polvo MEDA">📡
+          Clima</button>
       </div>
       <div class="copilot-input-row">
-        <input id="copilot-input" class="copilot-input" type="text" placeholder="Pregunta a CAPCOM ARES-AI (Llama 3)..." />
-        <button id="copilot-send-btn" class="route-btn copilot-send" type="button" title="Transmitir por radio">➤</button>
+        <input id="copilot-input" class="copilot-input" type="text"
+          placeholder="Pregunta a CAPCOM ARES-AI (Llama 3)..." />
+        <button id="copilot-send-btn" class="route-btn copilot-send" type="button"
+          title="Transmitir por radio">➤</button>
       </div>
     </div>
   </aside>
@@ -310,16 +338,22 @@
         <button id="route-pick-btn" class="route-btn" type="button">📍 Elegir Inicio / Destino</button>
         <button id="route-clear-btn" class="route-btn secondary" type="button" title="Limpiar ruta">✕</button>
       </div>
-      <button id="route-science-tour-btn" class="route-btn science-tour" type="button" title="Trazar travesía que parte del Refugio y visita múltiples POIs científicos">
+      <button id="route-science-tour-btn" class="route-btn science-tour" type="button"
+        title="Trazar travesía que parte del Refugio y visita múltiples POIs científicos">
         🔬 Travesía Científica (Multi-POI)
       </button>
       <div id="route-status" class="route-status">Haz clic en el botón o desde el popup del mapa.</div>
       <dl id="route-metrics" class="route-metrics">
-        <dt>Algoritmo</dt>    <dd id="rm-algo">A*</dd>
-        <dt>Distancia</dt>    <dd id="rm-dist">—</dd>
-        <dt>Oxígeno est.</dt> <dd id="rm-o2">—</dd>
-        <dt>Pend. máx.</dt>   <dd id="rm-slope">—</dd>
-        <dt>Riesgo (0-1)</dt> <dd id="rm-risk">—</dd>
+        <dt>Algoritmo</dt>
+        <dd id="rm-algo">A*</dd>
+        <dt>Distancia</dt>
+        <dd id="rm-dist">—</dd>
+        <dt>Oxígeno est.</dt>
+        <dd id="rm-o2">—</dd>
+        <dt>Pend. máx.</dt>
+        <dd id="rm-slope">—</dd>
+        <dt>Riesgo (0-1)</dt>
+        <dd id="rm-risk">—</dd>
       </dl>
       <div id="route-compare-box" class="route-compare-box" hidden></div>
       <div class="route-profile-wrap">
@@ -327,17 +361,72 @@
         <canvas id="route-profile-canvas" width="246" height="86"></canvas>
       </div>
       <button id="route-export-btn" class="route-btn export" type="button">⬇ Exportar route.json</button>
+      <!-- === NUEVO: Comparador clásico vs salud === -->
+      <details id="health-route-compare" class="health-route-compare">
+        <summary class="health-route-summary">
+          <span>🩺 Comparar con modelo de salud</span>
+          <span id="hrc-status" class="hrc-status">—</span>
+        </summary>
+
+        <div class="hrc-body">
+          <div class="hrc-field">
+            <label for="hrc-preset">Preset</label>
+            <select id="hrc-preset" class="dataset-select">
+              <option value="classic">🏁 Clásico (solo pendiente)</option>
+              <option value="safety">🛡️ Seguridad máxima (7 dims)</option>
+              <option value="balanced">⚖️ Balanceado (4 dims)</option>
+              <option value="science">🔬 Científico (O₂ optimizado)</option>
+              <option value="custom">⚙️ Custom</option>
+            </select>
+          </div>
+
+          <div class="hrc-field">
+            <label>Dimensiones activas</label>
+            <div id="hrc-checkboxes" class="hrc-checkboxes">
+              <label class="hrc-cb"><input type="checkbox" data-dim="slope" checked /><span>Pendiente</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="metabolic" /><span>Metabólico</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="heart_rate" /><span>FC</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="oxygen" /><span>O₂</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="thermal" /><span>Térmico</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="hydration" /><span>Hidratación</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="radiation" /><span>Radiación</span></label>
+            </div>
+          </div>
+
+          <button id="hrc-recompute-btn" class="route-btn" type="button">🔄 Recalcular comparación</button>
+
+          <div id="hrc-table-wrap" class="hrc-table-wrap" hidden>
+            <table class="hrc-table">
+              <thead>
+                <tr>
+                  <th>Métrica</th>
+                  <th>Clásico</th>
+                  <th>Salud</th>
+                  <th>Δ</th>
+                </tr>
+              </thead>
+              <tbody id="hrc-table-body"></tbody>
+            </table>
+            <div class="hrc-actions">
+              <button id="hrc-apply-health-btn" class="route-btn secondary" type="button">Ver ruta de salud en el
+                mapa</button>
+              <button id="hrc-apply-classic-btn" class="route-btn secondary" type="button">Volver a clásica</button>
+            </div>
+            <div id="hrc-verdict" class="hrc-verdict"></div>
+          </div>
+        </div>
+      </details>
     </aside>
 
     <div id="astronaut-dock" class="astronaut-dock" title="Arrastra el astronauta al mapa">
       <div class="dock-icon">
         <svg viewBox="0 0 100 100" aria-hidden="true">
           <g transform="translate(50 52)">
-            <ellipse cx="0" cy="18" rx="20" ry="24" fill="#f2f2f2" stroke="#2a3542" stroke-width="2"/>
-            <rect x="-30" y="6" width="11" height="24" rx="3" fill="#f2f2f2" stroke="#2a3542" stroke-width="2"/>
-            <circle cx="0" cy="-14" r="19" fill="#f2f2f2" stroke="#2a3542" stroke-width="2"/>
-            <path d="M -15 -15 Q 0 -32 15 -15 Q 15 -1 0 -1 Q -15 -1 -15 -15 Z" fill="#ff6a3d"/>
-            <rect x="-7" y="12" width="14" height="3" rx="1" fill="#ff6a3d"/>
+            <ellipse cx="0" cy="18" rx="20" ry="24" fill="#f2f2f2" stroke="#2a3542" stroke-width="2" />
+            <rect x="-30" y="6" width="11" height="24" rx="3" fill="#f2f2f2" stroke="#2a3542" stroke-width="2" />
+            <circle cx="0" cy="-14" r="19" fill="#f2f2f2" stroke="#2a3542" stroke-width="2" />
+            <path d="M -15 -15 Q 0 -32 15 -15 Q 15 -1 0 -1 Q -15 -1 -15 -15 Z" fill="#ff6a3d" />
+            <rect x="-7" y="12" width="14" height="3" rx="1" fill="#ff6a3d" />
           </g>
         </svg>
         <div class="dock-badge">✓</div>
@@ -363,9 +452,12 @@
       <div id="info-poi-source" class="info-poi-source"></div>
     </div>
     <dl class="info-grid">
-      <dt>Elevación</dt>  <dd id="info-elev">—</dd>
-      <dt>Pendiente</dt>  <dd id="info-slope">—</dd>
-      <dt>Distancia</dt>  <dd id="info-dist">—</dd>
+      <dt>Elevación</dt>
+      <dd id="info-elev">—</dd>
+      <dt>Pendiente</dt>
+      <dd id="info-slope">—</dd>
+      <dt>Distancia</dt>
+      <dd id="info-dist">—</dd>
     </dl>
     <div class="info-route-btns">
       <button id="popup-set-start" type="button">Fijar Inicio (A)</button>
@@ -377,7 +469,8 @@
   </div>
 
   <!-- Cinemática Inicial Narrativa: De la Tierra a Marte (E1) -->
-  <div id="intro-cinematic" class="intro-cinematic hidden" role="dialog" aria-label="Cinemática de misión Tierra a Marte">
+  <div id="intro-cinematic" class="intro-cinematic hidden" role="dialog"
+    aria-label="Cinemática de misión Tierra a Marte">
     <canvas id="cinematic-canvas"></canvas>
     <div class="cinematic-hud">
       <div class="cinematic-top-bar">
@@ -417,12 +510,15 @@
       </div>
       <p class="copilot-modal-desc">
         ARES-AI se comunica con <strong>Meta Llama 3</strong> vía <strong>Groq Cloud</strong> (ultrarrápido y gratuito).
-        Si no ingresas clave, opera con el <strong>Motor Aeroespacial Heurístico Offline</strong> de respaldo con datos en vivo.
+        Si no ingresas clave, opera con el <strong>Motor Aeroespacial Heurístico Offline</strong> de respaldo con datos
+        en vivo.
       </p>
       <div class="copilot-field">
         <label for="copilot-api-key-input">Groq API Key (gsk_...)</label>
-        <input id="copilot-api-key-input" type="password" placeholder="Pega tu clave gsk_... (opcional)" autocomplete="off" />
-        <small>Consigue tu clave gratis en <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> (se guarda solo en tu navegador).</small>
+        <input id="copilot-api-key-input" type="password" placeholder="Pega tu clave gsk_... (opcional)"
+          autocomplete="off" />
+        <small>Consigue tu clave gratis en <a href="https://console.groq.com/keys" target="_blank"
+            rel="noopener">console.groq.com</a> (se guarda solo en tu navegador).</small>
       </div>
       <div class="copilot-field">
         <label for="copilot-model-select">Modelo Llama 3</label>
@@ -457,4 +553,5 @@
   </script>
   <script type="module" src="main.js"></script>
 </body>
+
 </html>

@@ -170,6 +170,44 @@ def validate_poi_if_present(ds_dir: Path, ds_id: str, meta: dict):
         require(-half_w <= coords[0] <= half_w and -half_d <= coords[1] <= half_d,
                 f"[{ds_id}] POI '{p['id']}' position_m {coords} fuera de límites del DEM")
     return len(points)
+def validate_config_health_if_present(ds_dir: Path, ds_id: str) -> bool:
+    """Contrato 4.5 — opcional. Si existe, valida schema y rangos."""
+    cfg_path = ds_dir / "config_health.json"
+    if not cfg_path.is_file():
+        return False
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    require(cfg.get("dataset_id") == ds_id,
+            f"[{ds_id}] config_health.dataset_id != '{ds_id}'")
+
+    if "group_size" in cfg:
+        gs = cfg["group_size"]
+        require(isinstance(gs, int) and 1 <= gs <= 8,
+                f"[{ds_id}] config_health.group_size debe ser entero en [1, 8]")
+
+    members = cfg.get("members")
+    if members is not None:
+        require(isinstance(members, list) and 1 <= len(members) <= 8,
+                f"[{ds_id}] config_health.members debe ser lista de 1..8")
+        ids = set()
+        for m in members:
+            require(isinstance(m, dict), f"[{ds_id}] member no es objeto")
+            mid = m.get("id")
+            require(isinstance(mid, str) and mid and mid not in ids,
+                    f"[{ds_id}] member.id inválido o duplicado: {mid}")
+            ids.add(mid)
+            if "body_mass_kg" in m:
+                require(isinstance(m["body_mass_kg"], (int, float)) and 40 <= m["body_mass_kg"] <= 150,
+                        f"[{ds_id}] member '{mid}' body_mass_kg fuera de [40, 150]")
+            if "age_years" in m:
+                require(isinstance(m["age_years"], (int, float)) and 20 <= m["age_years"] <= 70,
+                        f"[{ds_id}] member '{mid}' age_years fuera de [20, 70]")
+            if "sex" in m:
+                require(m["sex"] in ("female", "male", "unspecified"),
+                        f"[{ds_id}] member '{mid}' sex inválido")
+            if "fitness_level" in m:
+                require(m["fitness_level"] in ("nominal", "fit", "deconditioned"),
+                        f"[{ds_id}] member '{mid}' fitness_level inválido")
+    return True
 
 
 def main() -> int:
@@ -187,6 +225,7 @@ def main() -> int:
     for ds_dir in datasets:
         ds_id = ds_dir.name
         try:
+            has_health = validate_config_health_if_present(ds_dir, ds_id)
             meta = validate_metadata_and_f32(ds_dir, ds_id)
             validate_config_fisio(ds_dir, ds_id)
             has_route = validate_route_if_present(ds_dir, ds_id)
@@ -204,6 +243,10 @@ def main() -> int:
     if not all_ok:
         return 1
     print("=== Todos los contratos (4.1, 4.2, 4.3, 4.4) validados correctamente ===")
+    print(f"  [OK] {ds_id}: DEM {cols}×{rows} ({w_m:.0f}×{d_m:.0f} m, {meta['resolution_m']} m/px) · "
+                f"config_fisio OK · POIs={n_pois} · route.json={'OK' if has_route else 'dinámico'} · "
+                f"health_override={'OK' if has_health else 'defaults'}"
+            )
     return 0
 
 

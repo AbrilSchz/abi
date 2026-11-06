@@ -6,7 +6,6 @@ import { CONFIG } from './config.js';
 export const state = {
   mode: 'orbit',
   exaggeration: 2.0,
-
   datasetId: null,
   metadata: null,
   dem: null,           // Float32Array original (rows × cols) en metros reales sin exageración
@@ -27,7 +26,14 @@ export const state = {
   },
   health: null,          // se inicializa en main.js tras cargar config_health.json
   healthMode: 'solo',    // 'solo' | 'group'
-
+  healthLastAggregate: null,
+  routeCostMode: 'oxygen',   // 'oxygen' | 'health' | 'balanced'
+  healthRouteResult: null,   // resultado de computeHealthOptimalRoute / comparador
+  routeCostDimensions: { slope: true, metabolic: false, heart_rate: false, oxygen: false, thermal: false, hydration: false, radiation: false },
+  routeCostPreset: 'classic',
+  routeComparison: null,
+  routeComparisonComputing: false,
+  healthRouteActive: false,
   /* Estado telemétrico del HUD (T7) */
   hud: {
     elev_m: 0,

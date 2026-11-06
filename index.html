@@ -151,6 +151,7 @@
         <div class="group-status-header">
           <span class="group-status-title">// GROUP_STATUS</span>
           <span id="group-status-meta" class="group-status-meta">solo · leader: —</span>
+          <div id="group-status-extra" class="group-status-extra">MODELO: G2 · RUTA: OXYGEN</div>
         </div>
         <div id="group-members-list" class="group-members-list"></div>
       </div>
@@ -346,6 +347,57 @@
         <canvas id="route-profile-canvas" width="246" height="86"></canvas>
       </div>
       <button id="route-export-btn" class="route-btn export" type="button">⬇ Exportar route.json</button>
+
+      <!-- === Comparador clásico vs salud === -->
+      <details id="health-route-compare" class="health-route-compare">
+        <summary class="health-route-summary">
+          <span>🩺 Comparar con modelo de salud</span>
+          <span id="hrc-status" class="hrc-status">—</span>
+        </summary>
+        <div class="hrc-body">
+          <div class="hrc-field">
+            <label for="hrc-preset">Preset</label>
+            <select id="hrc-preset" class="dataset-select">
+              <option value="classic">🏁 Clásico (solo pendiente)</option>
+              <option value="safety">🛡️ Seguridad máxima (7 dims)</option>
+              <option value="balanced">⚖️ Balanceado (4 dims)</option>
+              <option value="science">🔬 Científico (O₂ optimizado)</option>
+              <option value="custom">⚙️ Custom</option>
+            </select>
+          </div>
+          <div class="hrc-field">
+            <label>Dimensiones activas</label>
+            <div id="hrc-checkboxes" class="hrc-checkboxes">
+              <label class="hrc-cb"><input type="checkbox" data-dim="slope" checked /><span>Pendiente</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="metabolic" /><span>Metabólico</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="heart_rate" /><span>FC</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="oxygen" /><span>O₂</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="thermal" /><span>Térmico</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="hydration" /><span>Hidratación</span></label>
+              <label class="hrc-cb"><input type="checkbox" data-dim="radiation" /><span>Radiación</span></label>
+            </div>
+          </div>
+          <button id="hrc-recompute-btn" class="route-btn" type="button">🔄 Recalcular comparación</button>
+          <div id="hrc-table-wrap" class="hrc-table-wrap" hidden>
+            <table class="hrc-table">
+              <thead>
+                <tr>
+                  <th>Métrica</th>
+                  <th>Clásico</th>
+                  <th>Salud</th>
+                  <th>Δ</th>
+                </tr>
+              </thead>
+              <tbody id="hrc-table-body"></tbody>
+            </table>
+            <div class="hrc-actions">
+              <button id="hrc-apply-health-btn" class="route-btn secondary" type="button">Ver ruta de salud</button>
+              <button id="hrc-apply-classic-btn" class="route-btn secondary" type="button">Volver a clásica</button>
+            </div>
+            <div id="hrc-verdict" class="hrc-verdict"></div>
+          </div>
+        </div>
+      </details>
     </aside>
 
     <div id="astronaut-dock" class="astronaut-dock" title="Arrastra el astronauta al mapa">
