@@ -23,3 +23,6 @@ dist/
 .vite/
 *.log
 .DS_Store
+
+# Repositorio hermano de algoritmos
+Optimal_Route/

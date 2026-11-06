@@ -208,6 +208,8 @@ def validate_config_health_if_present(ds_dir: Path, ds_id: str) -> bool:
                 require(m["fitness_level"] in ("nominal", "fit", "deconditioned"),
                         f"[{ds_id}] member '{mid}' fitness_level inválido")
     return True
+
+
 def main() -> int:
     if not DATA_DIR.is_dir():
         print(f"ERROR: No existe el directorio {DATA_DIR}", file=sys.stderr)
