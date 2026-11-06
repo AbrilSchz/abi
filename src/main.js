@@ -11,6 +11,11 @@ import { benchmarkGroundSampling } from './raycast.js';
 import { initIntroCinematic, initRealtimeDemLoader } from './cinematic.js';
 import { tickArtifactsAnimation } from './artifacts3d.js';
 import { initCopilotUI } from './copilot.js';
+import { initTerrainLOD, updateTerrainLOD } from './terrain_lod.js';
+import { initTerrainFX, updateTerrainFX } from './terrain_fx.js';
+import { tickOrbitBackdrop, tickOrbitFill } from './orbit_backdrop.js';
+import { initPanels } from './panels.js';
+import { initStats, tickStats } from './stats.js';
 import { createSoloHealth, createGroupHealth, loadHealthModePreference } from './health_group.js';
 
 async function loadConfigHealth(datasetId) {
@@ -46,9 +51,13 @@ const clock = new THREE.Clock();
 (async () => {
   /* 1. Controles primero (crea OrbitControls que otros módulos necesitan) */
   initControls();
+  initPanels();
 
   /* 2. Cargar terreno */
   await loadHeightmap();
+  initStats();
+  initTerrainLOD();
+  initTerrainFX();
   benchmarkGroundSampling(200);
   await initHealthState();
   /* 3. Inicializar astronauta (dock + drag) */
@@ -82,5 +91,10 @@ function animate() {
   tickArtifactsAnimation(dt, clock.elapsedTime);
   updateSolarCycle(dt);
 
+  tickOrbitFill();
+  tickOrbitBackdrop();
+  updateTerrainLOD();
+  updateTerrainFX(dt);
   renderer.render(scene, camera);
+  tickStats();
 }
