@@ -6,17 +6,17 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { sampleDemHeightRelM, sampleSlopeDeg, sampleGroundY, getSlopeCostFactor } from './raycast.js';
 import { buildHumanScalePOIArtifactGroup, clearAnimatedArtifactsRegistry } from './artifacts3d.js';
-
+import { computeHealthOptimalRoute } from './health_route.js';
 let detailBumpTexture = null;
-let compositeCanvas   = null;
-let compositeCtx      = null;
-let compositeTexture  = null;
+let compositeCanvas = null;
+let compositeCtx = null;
+let compositeTexture = null;
 
 const LAYER_LABELS = {
-  base:   'Textura Base (CTX/MOLA)',
-  slope:  'Pendiente (°)',
-  risk:   'Riesgo Terreno',
-  crism:  'Mineralogía CRISM (MRO)',
+  base: 'Textura Base (CTX/MOLA)',
+  slope: 'Pendiente (°)',
+  risk: 'Riesgo Terreno',
+  crism: 'Mineralogía CRISM (MRO)',
   themis: 'Inercia Térmica THEMIS',
 };
 
@@ -107,11 +107,11 @@ export async function loadHeightmap() {
     const fisioRes = await fetch(`${baseDir}/config_fisio.json`, { cache: 'no-store' });
     if (fisioRes.ok) {
       const fisioData = await fisioRes.json();
-      if (typeof fisioData.gravity_ms2 === 'number')                 state.fisio.gravity_ms2 = fisioData.gravity_ms2;
-      if (typeof fisioData.eye_height_m === 'number')                state.fisio.eye_height_m = fisioData.eye_height_m;
-      if (typeof fisioData.walk_speed_ms === 'number')               state.fisio.walk_speed_ms = fisioData.walk_speed_ms;
-      if (typeof fisioData.run_speed_ms === 'number')                state.fisio.run_speed_ms = fisioData.run_speed_ms;
-      if (typeof fisioData.max_safe_slope_deg === 'number')          state.fisio.max_safe_slope_deg = fisioData.max_safe_slope_deg;
+      if (typeof fisioData.gravity_ms2 === 'number') state.fisio.gravity_ms2 = fisioData.gravity_ms2;
+      if (typeof fisioData.eye_height_m === 'number') state.fisio.eye_height_m = fisioData.eye_height_m;
+      if (typeof fisioData.walk_speed_ms === 'number') state.fisio.walk_speed_ms = fisioData.walk_speed_ms;
+      if (typeof fisioData.run_speed_ms === 'number') state.fisio.run_speed_ms = fisioData.run_speed_ms;
+      if (typeof fisioData.max_safe_slope_deg === 'number') state.fisio.max_safe_slope_deg = fisioData.max_safe_slope_deg;
       if (typeof fisioData.o2_reserve_l === 'number' && fisioData.o2_reserve_l > 0) {
         state.fisio.o2_reserve_l = fisioData.o2_reserve_l;
       }
@@ -181,12 +181,12 @@ async function initLayersFromMetadata(metadata, baseDir, loadImageElement) {
   const [rows, cols] = metadata.shape;
   /* Tamaño del lienzo de composición (máx 1024 px de lado para fluidez al cambiar opacidad) */
   const maxDim = 1024;
-  const scale  = Math.min(1, maxDim / Math.max(cols, rows));
-  const compW  = Math.max(64, Math.round(cols * scale));
-  const compH  = Math.max(64, Math.round(rows * scale));
+  const scale = Math.min(1, maxDim / Math.max(cols, rows));
+  const compW = Math.max(64, Math.round(cols * scale));
+  const compH = Math.max(64, Math.round(rows * scale));
 
   compositeCanvas = document.createElement('canvas');
-  compositeCanvas.width  = compW;
+  compositeCanvas.width = compW;
   compositeCanvas.height = compH;
   compositeCtx = compositeCanvas.getContext('2d');
 
@@ -244,17 +244,17 @@ async function initLayersFromMetadata(metadata, baseDir, loadImageElement) {
     }
 
     const isBase = layerDef.type === 'base' || layerDef.id === 'base';
-    const label  = layerDef.label || LAYER_LABELS[layerDef.id] || layerDef.id;
+    const label = layerDef.label || LAYER_LABELS[layerDef.id] || layerDef.id;
 
     const layerObj = {
-      id:      layerDef.id,
+      id: layerDef.id,
       label,
-      type:    layerDef.type || (isBase ? 'base' : 'overlay'),
-      unit:    layerDef.unit || '',
-      range:   layerDef.range || null,
+      type: layerDef.type || (isBase ? 'base' : 'overlay'),
+      unit: layerDef.unit || '',
+      range: layerDef.range || null,
       enabled: isBase, // base activa por defecto; overlays desactivados al inicio
       opacity: isBase ? 1.0 : 0.65,
-      source:  sourceCanvasOrImg,
+      source: sourceCanvasOrImg,
       enable() {
         this.enabled = true;
         updateCompositeTexture();
@@ -281,7 +281,7 @@ async function initLayersFromMetadata(metadata, baseDir, loadImageElement) {
 
 function tintBaseImageToMarsCanvas(img, w, h) {
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   ctx.drawImage(img, 0, 0, w, h);
@@ -291,7 +291,7 @@ function tintBaseImageToMarsCanvas(img, w, h) {
   for (let i = 0; i < px.length; i += 4) {
     const lum = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 255;
     const factor = 0.28 + lum * 0.85;
-    px[i]     = Math.min(255, Math.round(196 * factor));
+    px[i] = Math.min(255, Math.round(196 * factor));
     px[i + 1] = Math.min(255, Math.round(113 * factor));
     px[i + 2] = Math.min(255, Math.round(74 * factor));
     px[i + 3] = 255;
@@ -302,7 +302,7 @@ function tintBaseImageToMarsCanvas(img, w, h) {
 
 function generateBaseFallbackCanvas(w, h) {
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   const imgData = ctx.createImageData(w, h);
@@ -328,7 +328,7 @@ function generateBaseFallbackCanvas(w, h) {
       const t = THREE.MathUtils.clamp(hRel_m / range_m, 0, 1);
       const factor = (0.36 + t * 0.72) * shade;
       const o = (y * w + x) * 4;
-      px[o]     = Math.min(255, Math.round(202 * factor));
+      px[o] = Math.min(255, Math.round(202 * factor));
       px[o + 1] = Math.min(255, Math.round(116 * factor));
       px[o + 2] = Math.min(255, Math.round(76 * factor));
       px[o + 3] = 255;
@@ -343,7 +343,7 @@ function generateBaseFallbackCanvas(w, h) {
  */
 function generateSlopeLayerCanvas(w, h, rangeDeg = [0, 45]) {
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   const imgData = ctx.createImageData(w, h);
@@ -380,7 +380,7 @@ function generateSlopeLayerCanvas(w, h, rangeDeg = [0, 45]) {
       }
 
       const o = (y * w + x) * 4;
-      px[o]     = r;
+      px[o] = r;
       px[o + 1] = g;
       px[o + 2] = b;
       px[o + 3] = 255;
@@ -395,7 +395,7 @@ function generateSlopeLayerCanvas(w, h, rangeDeg = [0, 45]) {
  */
 function generateRiskLayerCanvas(w, h) {
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   const imgData = ctx.createImageData(w, h);
@@ -415,20 +415,20 @@ function generateRiskLayerCanvas(w, h) {
       if (risk < 0.45) {
         /* Zona segura: verde translúcido sutil */
         const k = risk / 0.45;
-        px[o]     = Math.round(40 + 140 * k);
+        px[o] = Math.round(40 + 140 * k);
         px[o + 1] = Math.round(200 - 20 * k);
         px[o + 2] = 70;
         px[o + 3] = Math.round(70 + 110 * k);
       } else if (risk < 0.85) {
         /* Precaución: ámbar/naranja */
         const k = (risk - 0.45) / 0.4;
-        px[o]     = Math.round(230 + 25 * k);
+        px[o] = Math.round(230 + 25 * k);
         px[o + 1] = Math.round(180 - 110 * k);
         px[o + 2] = 25;
         px[o + 3] = Math.round(180 + 55 * k);
       } else {
         /* Peligro (> umbral seguro): rojo/magenta de alta visibilidad */
-        px[o]     = 255;
+        px[o] = 255;
         px[o + 1] = 32;
         px[o + 2] = 68;
         px[o + 3] = 250;
@@ -441,7 +441,7 @@ function generateRiskLayerCanvas(w, h) {
 
 function generateGenericOverlayCanvas(w, h) {
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   ctx.fillStyle = 'rgba(120, 190, 255, 0.5)';
@@ -456,7 +456,7 @@ function generateGenericOverlayCanvas(w, h) {
  */
 function generateCrismLayerCanvas(w, h) {
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   const imgData = ctx.createImageData(w, h);
@@ -476,21 +476,21 @@ function generateCrismLayerCanvas(w, h) {
 
       /* Banda de carbonatos marginales (elevNorm ~ 0.25..0.52 y pendiente moderada 3°..16°) */
       const carbScore = Math.exp(-Math.pow((elevNorm - 0.36) / 0.14, 2)) *
-                        Math.exp(-Math.pow((slope_deg - 8.5) / 7.5, 2));
+        Math.exp(-Math.pow((slope_deg - 8.5) / 7.5, 2));
       /* Banda de arcillas / filosilicatos Fe-Mg en pisos de cuenca y abanicos deltaicos (elevNorm < 0.35, baja pendiente) */
       const clayScore = Math.exp(-Math.pow((elevNorm - 0.18) / 0.14, 2)) *
-                        Math.exp(-Math.pow(slope_deg / 9.0, 2));
+        Math.exp(-Math.pow(slope_deg / 9.0, 2));
 
       const o = (y * w + x) * 4;
       if (carbScore > 0.28 && carbScore >= clayScore) {
         const k = THREE.MathUtils.clamp((carbScore - 0.22) / 0.65, 0, 1);
-        px[o]     = Math.round(145 + 75 * k);
+        px[o] = Math.round(145 + 75 * k);
         px[o + 1] = Math.round(70 + 60 * k);
         px[o + 2] = 255;
         px[o + 3] = Math.round(95 + 145 * k);
       } else if (clayScore > 0.22) {
         const k = THREE.MathUtils.clamp((clayScore - 0.18) / 0.68, 0, 1);
-        px[o]     = Math.round(20 + 60 * k);
+        px[o] = Math.round(20 + 60 * k);
         px[o + 1] = Math.round(190 + 62 * k);
         px[o + 2] = Math.round(195 + 55 * k);
         px[o + 3] = Math.round(85 + 150 * k);
@@ -510,7 +510,7 @@ function generateCrismLayerCanvas(w, h) {
  */
 function generateThemisLayerCanvas(w, h) {
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   const imgData = ctx.createImageData(w, h);
@@ -535,14 +535,14 @@ function generateThemisLayerCanvas(w, h) {
       if (tiNorm < 0.35) {
         /* Baja inercia térmica (dunas / regolito suelto): azul índigo */
         const k = 1 - tiNorm / 0.35;
-        px[o]     = Math.round(35 - 15 * k);
+        px[o] = Math.round(35 - 15 * k);
         px[o + 1] = Math.round(115 - 35 * k);
         px[o + 2] = Math.round(235 + 20 * k);
         px[o + 3] = Math.round(90 + 135 * k);
       } else if (tiNorm > 0.58) {
         /* Alta inercia térmica (roca consolidada): ámbar / dorado intenso */
         const k = (tiNorm - 0.58) / 0.42;
-        px[o]     = 250;
+        px[o] = 250;
         px[o + 1] = Math.round(165 - 55 * k);
         px[o + 2] = Math.round(35 - 15 * k);
         px[o + 3] = Math.round(85 + 145 * k);
@@ -619,10 +619,10 @@ function renderLayersPanelUI() {
     sliderRow.className = 'layer-slider-row';
 
     const slider = document.createElement('input');
-    slider.type  = 'range';
-    slider.min   = '0';
-    slider.max   = '1';
-    slider.step  = '0.05';
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '1';
+    slider.step = '0.05';
     slider.value = String(layer.opacity);
     slider.setAttribute('aria-label', `Opacidad de ${layer.label}`);
     slider.addEventListener('input', () => {
@@ -684,8 +684,8 @@ export function buildTerrain(metadata, demFloat32, texture) {
     `elev [${minElev_m}, ${maxElev_m}] m · ${state.layers.length} capas registradas`
   );
 
-  state.dem         = demFloat32;
-  state.heights     = data_m;
+  state.dem = demFloat32;
+  state.heights = data_m;
   state.baseTexture = texture || null;
 
   /* Si ya existía una malla de terreno previa (carga en caliente de otro DEM), liberarla limpiamente */
@@ -727,7 +727,7 @@ export function buildTerrain(metadata, demFloat32, texture) {
   const dim_m = Math.max(state.terrainWidth, state.terrainDepth);
 
   camera.near = 0.2;
-  camera.far  = dim_m * 12;
+  camera.far = dim_m * 12;
   camera.updateProjectionMatrix();
 
   if (state.orbitControls) {
@@ -762,11 +762,11 @@ export function computeMartianSolarPhysics() {
   const RAD2DEG = 180 / Math.PI;
 
   /* 1. Órbita excéntrica de Marte y distancia heliocéntrica r(Ls) en AU */
-  const a_au   = 1.52368;
-  const ecc    = 0.0934;
+  const a_au = 1.52368;
+  const ecc = 0.0934;
   const ls_rad = s.ls_deg * DEG2RAD;
   const nu_rad = (s.ls_deg - 251.0) * DEG2RAD; // Anomalía verdadera respecto al perihelio (Ls = 251°)
-  const r_au   = (a_au * (1 - ecc * ecc)) / (1 + ecc * Math.cos(nu_rad));
+  const r_au = (a_au * (1 - ecc * ecc)) / (1 + ecc * Math.cos(nu_rad));
   s.distance_au = r_au;
 
   /* 2. Irradiancia solar en el tope de la atmósfera marciana (Ley 1/r²) */
@@ -775,16 +775,16 @@ export function computeMartianSolarPhysics() {
 
   /* 3. Declinación solar δ con oblicuidad axial de Marte ε = 25.19° */
   const obliq_rad = 25.19 * DEG2RAD;
-  const sinDelta  = Math.sin(obliq_rad) * Math.sin(ls_rad);
+  const sinDelta = Math.sin(obliq_rad) * Math.sin(ls_rad);
   const delta_rad = Math.asin(THREE.MathUtils.clamp(sinDelta, -1, 1));
-  const cosDelta  = Math.cos(delta_rad);
+  const cosDelta = Math.cos(delta_rad);
   s.declination_deg = delta_rad * RAD2DEG;
 
   /* 4. Ángulo horario h (LTST: 12:00 = mediodía solar verdadero) y coordenadas horizontales (Elevación / Acimut) */
   const phi_rad = s.lat_deg * DEG2RAD;
-  const sinPhi  = Math.sin(phi_rad);
-  const cosPhi  = Math.cos(phi_rad);
-  const h_rad   = (s.ltst_h - 12.0) * 15.0 * DEG2RAD;
+  const sinPhi = Math.sin(phi_rad);
+  const cosPhi = Math.cos(phi_rad);
+  const h_rad = (s.ltst_h - 12.0) * 15.0 * DEG2RAD;
 
   const sinAlpha = THREE.MathUtils.clamp(
     sinPhi * sinDelta + cosPhi * cosDelta * Math.cos(h_rad),
@@ -833,11 +833,11 @@ export function computeMartianSolarPhysics() {
 
   /* 6. Onda térmica diurna superficial acoplada a la irradiancia y desfase de inercia térmica (~14:15 LTST) */
   const isStorm = w.mode === 'dust_storm';
-  const rRatio  = 1.52368 / r_au; // > 1 en perihelio (más cálido), < 1 en afelio (más frío)
+  const rRatio = 1.52368 / r_au; // > 1 en perihelio (más cálido), < 1 en afelio (más frío)
   const seasonalOffset_c = (rRatio - 1.0) * 95.0;
   const diurnalWave = Math.cos(((s.ltst_h - 14.2) / 24.0) * Math.PI * 2);
-  const meanTemp_c  = (isStorm ? -68.0 : -56.0) + seasonalOffset_c;
-  const ampTemp_c   = isStorm ? 14.0 : 31.0; // Las tormentas de polvo amortiguan la amplitud térmica diurna
+  const meanTemp_c = (isStorm ? -68.0 : -56.0) + seasonalOffset_c;
+  const ampTemp_c = isStorm ? 14.0 : 31.0; // Las tormentas de polvo amortiguan la amplitud térmica diurna
   w.temp_c = Math.round(meanTemp_c + ampTemp_c * diurnalWave);
 
   /* Penalización térmica del traje EVA (aumenta de noche extrema o durante tormenta de polvo) */
@@ -849,13 +849,13 @@ export function computeMartianSolarPhysics() {
   const az_rad = az_deg * DEG2RAD;
   const cosAlpha = Math.cos(alpha_rad);
 
-  const dirX =  cosAlpha * Math.sin(az_rad);
-  const dirY =  Math.sin(alpha_rad);
+  const dirX = cosAlpha * Math.sin(az_rad);
+  const dirY = Math.sin(alpha_rad);
   const dirZ = -cosAlpha * Math.cos(az_rad);
 
   /* Para proyectar sombras limpias sobre el terreno incluso al ras del horizonte, mantener altura mínima de luz */
   const lightElevY = Math.max(dirY, 0.05);
-  const sunDist_m  = dim_m * 1.35;
+  const sunDist_m = dim_m * 1.35;
   sun.position.set(dirX * sunDist_m, lightElevY * sunDist_m, dirZ * sunDist_m);
   fill.position.set(-dirX * sunDist_m * 0.7, Math.max(0.25, Math.abs(dirY)) * sunDist_m * 0.5, -dirZ * sunDist_m * 0.7);
 
@@ -885,12 +885,12 @@ export function computeMartianSolarPhysics() {
 export function applyWeatherAtmosphere() {
   computeMartianSolarPhysics();
 
-  const dim_m       = Math.max(state.terrainWidth || 30000, state.terrainDepth || 30000);
+  const dim_m = Math.max(state.terrainWidth || 30000, state.terrainDepth || 30000);
   const halfPatch_m = CONFIG.PATCH_SIZE_M * 0.5;
-  const isStorm     = state.weather?.mode === 'dust_storm';
-  const isFP        = state.mode === 'fp';
-  const s           = state.solar;
-  const alpha_deg   = s.elevation_deg;
+  const isStorm = state.weather?.mode === 'dust_storm';
+  const isFP = state.mode === 'fp';
+  const s = state.solar;
+  const alpha_deg = s.elevation_deg;
 
   /* Factor físico de flujo solar según distancia heliocéntrica (1/r²) normalizado a la media marciana (586 W/m²) */
   const fluxFactor = s.toa_irradiance_wm2 / 586.0;
@@ -1090,17 +1090,17 @@ export function applyWeatherAtmosphere() {
 export function toggleDustStormSimulation(forceState = null) {
   const nextStorm = forceState !== null ? forceState : state.weather.mode !== 'dust_storm';
   if (nextStorm) {
-    state.weather.mode         = 'dust_storm';
+    state.weather.mode = 'dust_storm';
     state.weather.pressure_hpa = 7.1;
-    state.weather.wind_ms      = 28.5;
-    state.weather.dust_tau     = 3.85;
-    state.weather.uv_level     = 'ATENUADO (TORMENTA)';
+    state.weather.wind_ms = 28.5;
+    state.weather.dust_tau = 3.85;
+    state.weather.uv_level = 'ATENUADO (TORMENTA)';
   } else {
-    state.weather.mode         = 'nominal';
+    state.weather.mode = 'nominal';
     state.weather.pressure_hpa = 7.4;
-    state.weather.wind_ms      = 5.2;
-    state.weather.dust_tau     = 0.45;
-    state.weather.uv_level     = 'MODERADO';
+    state.weather.wind_ms = 5.2;
+    state.weather.dust_tau = 0.45;
+    state.weather.uv_level = 'MODERADO';
   }
   applyWeatherAtmosphere();
 }
@@ -1132,16 +1132,16 @@ export function computeEmergencyEvacuationRoute() {
   if (!nearestShelter) return;
 
   state.routeStart_m = [Number(px.toFixed(1)), Number(pz.toFixed(1))];
-  state.routeGoal_m  = nearestShelter.position_m.slice();
+  state.routeGoal_m = nearestShelter.position_m.slice();
   recomputeRoutesForCurrentWaypoints();
 }
 
 function initWeatherAndEmergencyUI() {
-  const stormBtn   = document.getElementById('weather-storm-btn');
-  const evacBtn    = document.getElementById('weather-evac-btn');
+  const stormBtn = document.getElementById('weather-storm-btn');
+  const evacBtn = document.getElementById('weather-evac-btn');
   const ltstSlider = document.getElementById('solar-ltst-slider');
-  const lsSelect   = document.getElementById('solar-ls-select');
-  const cycleBtn   = document.getElementById('solar-cycle-btn');
+  const lsSelect = document.getElementById('solar-ls-select');
+  const cycleBtn = document.getElementById('solar-cycle-btn');
 
   if (stormBtn && !stormBtn.dataset.bound) {
     stormBtn.dataset.bound = '1';
@@ -1202,18 +1202,18 @@ export function renderWeatherUI() {
   if (!w || !s) return;
   const isStorm = w.mode === 'dust_storm';
 
-  const coordsEl   = document.getElementById('solar-coords-label');
+  const coordsEl = document.getElementById('solar-coords-label');
   const phaseBadge = document.getElementById('solar-phase-badge');
-  const ltstValEl  = document.getElementById('solar-ltst-val');
+  const ltstValEl = document.getElementById('solar-ltst-val');
   const ltstSlider = document.getElementById('solar-ltst-slider');
-  const distAuEl   = document.getElementById('wm-dist-au');
-  const irradEl    = document.getElementById('wm-irrad');
-  const sunAngEl   = document.getElementById('wm-sun-ang');
-  const tempEl     = document.getElementById('wm-temp');
-  const windEl     = document.getElementById('wm-wind');
-  const tauEl      = document.getElementById('wm-tau');
-  const stormBtn   = document.getElementById('weather-storm-btn');
-  const hudEnvEl   = document.getElementById('hud-env-line');
+  const distAuEl = document.getElementById('wm-dist-au');
+  const irradEl = document.getElementById('wm-irrad');
+  const sunAngEl = document.getElementById('wm-sun-ang');
+  const tempEl = document.getElementById('wm-temp');
+  const windEl = document.getElementById('wm-wind');
+  const tauEl = document.getElementById('wm-tau');
+  const stormBtn = document.getElementById('weather-storm-btn');
+  const hudEnvEl = document.getElementById('hud-env-line');
 
   const latTag = `${Math.abs(s.lat_deg).toFixed(2)}°${s.lat_deg >= 0 ? 'N' : 'S'}`;
   const lonTag = `${Math.abs(s.lon_deg).toFixed(2)}°${s.lon_deg >= 0 ? 'E' : 'W'}`;
@@ -1251,7 +1251,7 @@ export function renderWeatherUI() {
     sunAngEl.textContent = `El ${s.elevation_deg.toFixed(1)}° · Az ${s.azimuth_deg.toFixed(0)}°`;
   }
 
-  if (tempEl)  tempEl.textContent = `${w.temp_c} °C`;
+  if (tempEl) tempEl.textContent = `${w.temp_c} °C`;
   if (windEl) {
     windEl.textContent = `${w.wind_ms.toFixed(1)} m/s`;
     windEl.style.color = isStorm ? '#ff3855' : '';
@@ -1283,7 +1283,7 @@ function getDetailBumpTexture() {
   /* Textura procedural tileable de regolito/roca fina a escala métrica (sin allocs por frame) */
   const size = 256;
   const canvas = document.createElement('canvas');
-  canvas.width  = size;
+  canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   const imgData = ctx.createImageData(size, size);
@@ -1325,7 +1325,7 @@ function ensureLocalPatchCreated() {
   if (state.localPatchMesh) return;
 
   const seg = CONFIG.PATCH_SEGMENTS;
-  const N   = seg + 1;
+  const N = seg + 1;
   const size_m = CONFIG.PATCH_SIZE_M;
 
   const geo = new THREE.PlaneGeometry(size_m, size_m, seg, seg);
@@ -1355,8 +1355,8 @@ function ensureLocalPatchCreated() {
   mesh.visible = false;
   scene.add(mesh);
 
-  state.localPatchGeo     = geo;
-  state.localPatchMesh    = mesh;
+  state.localPatchGeo = geo;
+  state.localPatchMesh = mesh;
   state.localPatchHeights = new Float32Array(N * N);
 }
 
@@ -1368,19 +1368,19 @@ export function rebuildLocalPatch(centerX_m, centerZ_m) {
   if (!state.dem || !state.metadata) return;
   ensureLocalPatchCreated();
 
-  const seg    = CONFIG.PATCH_SEGMENTS;
-  const N      = seg + 1;
+  const seg = CONFIG.PATCH_SEGMENTS;
+  const N = seg + 1;
   const size_m = CONFIG.PATCH_SIZE_M;
-  const w_m    = state.terrainWidth;
-  const d_m    = state.terrainDepth;
-  const ex     = state.exaggeration;
+  const w_m = state.terrainWidth;
+  const d_m = state.terrainDepth;
+  const ex = state.exaggeration;
 
   state.localPatchCenter.set(centerX_m, centerZ_m);
 
-  const pos       = state.localPatchGeo.attributes.position;
-  const uv        = state.localPatchGeo.attributes.uv;
-  const pHeights  = state.localPatchHeights;
-  const repeats   = size_m / 4;
+  const pos = state.localPatchGeo.attributes.position;
+  const uv = state.localPatchGeo.attributes.uv;
+  const pHeights = state.localPatchHeights;
+  const repeats = size_m / 4;
 
   /* Desplazar ligeramente el offset de la textura de micro-detalle según el centro en el mundo
      para que al recentrar el parche el grano del suelo no salte visualmente. */
@@ -1394,13 +1394,13 @@ export function rebuildLocalPatch(centerX_m, centerZ_m) {
   for (let iz = 0; iz < N; iz++) {
     const localZ_m = (iz / seg - 0.5) * size_m;
     const worldZ_m = centerZ_m + localZ_m;
-    const vGlobal  = 1.0 - THREE.MathUtils.clamp((worldZ_m + d_m * 0.5) / d_m, 0, 1);
+    const vGlobal = 1.0 - THREE.MathUtils.clamp((worldZ_m + d_m * 0.5) / d_m, 0, 1);
 
     for (let ix = 0; ix < N; ix++) {
-      const idx      = iz * N + ix;
+      const idx = iz * N + ix;
       const localX_m = (ix / seg - 0.5) * size_m;
       const worldX_m = centerX_m + localX_m;
-      const uGlobal  = THREE.MathUtils.clamp((worldX_m + w_m * 0.5) / w_m, 0, 1);
+      const uGlobal = THREE.MathUtils.clamp((worldX_m + w_m * 0.5) / w_m, 0, 1);
 
       const hRel_m = sampleDemHeightRelM(
         THREE.MathUtils.clamp(worldX_m, -w_m * 0.5, w_m * 0.5),
@@ -1415,7 +1415,7 @@ export function rebuildLocalPatch(centerX_m, centerZ_m) {
 
   state.localPatchMesh.position.set(centerX_m, 0, centerZ_m);
   pos.needsUpdate = true;
-  uv.needsUpdate  = true;
+  uv.needsUpdate = true;
   state.localPatchGeo.computeVertexNormals();
   state.localPatchGeo.computeBoundingBox();
   state.localPatchGeo.computeBoundingSphere();
@@ -1425,7 +1425,7 @@ export function rebuildLocalPatch(centerX_m, centerZ_m) {
 export function enableLocalPatch(centerX_m, centerZ_m) {
   rebuildLocalPatch(centerX_m, centerZ_m);
   if (state.localPatchMesh) state.localPatchMesh.visible = true;
-  if (state.terrainMesh)    state.terrainMesh.visible    = false;
+  if (state.terrainMesh) state.terrainMesh.visible = false;
   applyWeatherAtmosphere();
   updateRouteViewMode();
   updatePOIViewMode();
@@ -1442,7 +1442,7 @@ export function updateLocalPatchIfNeeded(x_m, z_m) {
 
 export function disableLocalPatch() {
   if (state.localPatchMesh) state.localPatchMesh.visible = false;
-  if (state.terrainMesh)    state.terrainMesh.visible    = true;
+  if (state.terrainMesh) state.terrainMesh.visible = true;
   applyWeatherAtmosphere();
   updateRouteViewMode();
   updatePOIViewMode();
@@ -1452,7 +1452,7 @@ export function disableLocalPatch() {
 export function applyHeights(ex) {
   state.exaggeration = ex;
   if (state.terrainGeo && state.heights) {
-    const pos   = state.terrainGeo.attributes.position;
+    const pos = state.terrainGeo.attributes.position;
     const count = pos.count;
 
     for (let i = 0; i < count; i++) {
@@ -1467,7 +1467,7 @@ export function applyHeights(ex) {
   }
 
   if (state.localPatchGeo && state.localPatchHeights) {
-    const pPos   = state.localPatchGeo.attributes.position;
+    const pPos = state.localPatchGeo.attributes.position;
     const pCount = pPos.count;
     for (let i = 0; i < pCount; i++) {
       pPos.setY(i, state.localPatchHeights[i] * ex);
@@ -1490,10 +1490,10 @@ const ROUTE_GRID_N = 160; // Cuadrícula de búsqueda 160×160 sobre el DEM (rá
 export function computeAStarRoute(startX_m, startZ_m, goalX_m, goalZ_m) {
   if (!state.dem || !state.metadata) return null;
 
-  const w_m     = state.terrainWidth;
-  const d_m     = state.terrainDepth;
-  const GN      = ROUTE_GRID_N;
-  const total   = GN * GN;
+  const w_m = state.terrainWidth;
+  const d_m = state.terrainDepth;
+  const GN = ROUTE_GRID_N;
+  const total = GN * GN;
   const cellW_m = w_m / (GN - 1);
   const cellD_m = d_m / (GN - 1);
 
@@ -1508,29 +1508,29 @@ export function computeAStarRoute(startX_m, startZ_m, goalX_m, goalZ_m) {
   const gz = toGridZ(goalZ_m);
 
   const startIdx = sz * GN + sx;
-  const goalIdx  = gz * GN + gx;
+  const goalIdx = gz * GN + gx;
 
   /* Precalcular elevación relativa (m) y pendiente real (°) en cada nodo de la rejilla */
-  const nodeElev  = new Float32Array(total);
+  const nodeElev = new Float32Array(total);
   const nodeSlope = new Float32Array(total);
   for (let iz = 0; iz < GN; iz++) {
     const wz = toWorldZ(iz);
     const rowOff = iz * GN;
     for (let ix = 0; ix < GN; ix++) {
       const wx = toWorldX(ix);
-      nodeElev[rowOff + ix]  = sampleDemHeightRelM(wx, wz) ?? 0;
+      nodeElev[rowOff + ix] = sampleDemHeightRelM(wx, wz) ?? 0;
       nodeSlope[rowOff + ix] = sampleSlopeDeg(wx, wz);
     }
   }
 
   const walkSpeed_ms = Math.max(state.fisio.walk_speed_ms || 1.2, 0.2);
   const baseRate_l_s = (state.fisio.o2_base_consumption_l_per_h || 50.0) / 3600.0;
-  const maxSafeDeg   = state.fisio.max_safe_slope_deg || 25;
+  const maxSafeDeg = state.fisio.max_safe_slope_deg || 25;
 
   const gScore = new Float64Array(total);
   const fScore = new Float64Array(total);
   const cameFrom = new Int32Array(total);
-  const closed   = new Uint8Array(total);
+  const closed = new Uint8Array(total);
   gScore.fill(Infinity);
   fScore.fill(Infinity);
   cameFrom.fill(-1);
@@ -1578,14 +1578,14 @@ export function computeAStarRoute(startX_m, startZ_m, goalX_m, goalZ_m) {
   pushHeap(startIdx, fScore[startIdx]);
 
   const dirs = [
-    [-1,  0, cellW_m],
-    [ 1,  0, cellW_m],
-    [ 0, -1, cellD_m],
-    [ 0,  1, cellD_m],
+    [-1, 0, cellW_m],
+    [1, 0, cellW_m],
+    [0, -1, cellD_m],
+    [0, 1, cellD_m],
     [-1, -1, Math.hypot(cellW_m, cellD_m)],
-    [ 1, -1, Math.hypot(cellW_m, cellD_m)],
-    [-1,  1, Math.hypot(cellW_m, cellD_m)],
-    [ 1,  1, Math.hypot(cellW_m, cellD_m)],
+    [1, -1, Math.hypot(cellW_m, cellD_m)],
+    [-1, 1, Math.hypot(cellW_m, cellD_m)],
+    [1, 1, Math.hypot(cellW_m, cellD_m)],
   ];
 
   while (heap.length > 0) {
@@ -1606,18 +1606,18 @@ export function computeAStarRoute(startX_m, startZ_m, goalX_m, goalZ_m) {
       const nIdx = nz * GN + nx;
       if (closed[nIdx]) continue;
 
-      const stepDist_m  = dirs[d][2];
-      const nextElev    = nodeElev[nIdx];
+      const stepDist_m = dirs[d][2];
+      const nextElev = nodeElev[nIdx];
       const deltaElev_m = nextElev - curElev;
       const segSlopeDeg = Math.atan(Math.abs(deltaElev_m) / stepDist_m) * (180 / Math.PI);
-      const localSlope  = Math.max(nodeSlope[nIdx], segSlopeDeg);
+      const localSlope = Math.max(nodeSlope[nIdx], segSlopeDeg);
 
       /* Costo base de oxígeno en litros usando la función fisiológica de T7 */
       const slopeFactor = getSlopeCostFactor(localSlope, deltaElev_m);
-      const climbGrade  = deltaElev_m / stepDist_m;
-      const climbBonus  = climbGrade > 0 ? 1.0 + climbGrade * 4.5 : Math.max(0.8, 1.0 + climbGrade * 0.8);
-      const stepTime_s  = stepDist_m / walkSpeed_ms;
-      const edgeO2_l    = baseRate_l_s * slopeFactor * climbBonus * stepTime_s;
+      const climbGrade = deltaElev_m / stepDist_m;
+      const climbBonus = climbGrade > 0 ? 1.0 + climbGrade * 4.5 : Math.max(0.8, 1.0 + climbGrade * 0.8);
+      const stepTime_s = stepDist_m / walkSpeed_ms;
+      const edgeO2_l = baseRate_l_s * slopeFactor * climbBonus * stepTime_s;
 
       /* Penalización severa cuando la pendiente supera max_safe_slope_deg
          para que A* evite pendientes sobre el umbral siempre que exista alternativa (criterio T8) */
@@ -1633,8 +1633,8 @@ export function computeAStarRoute(startX_m, startZ_m, goalX_m, goalZ_m) {
       const tentativeG = gScore[current] + edgeO2_l * safetyPenalty;
       if (tentativeG < gScore[nIdx]) {
         cameFrom[nIdx] = current;
-        gScore[nIdx]   = tentativeG;
-        fScore[nIdx]   = tentativeG + heuristicO2(nx, nz);
+        gScore[nIdx] = tentativeG;
+        fScore[nIdx] = tentativeG + heuristicO2(nx, nz);
         pushHeap(nIdx, fScore[nIdx]);
       }
     }
@@ -1661,8 +1661,8 @@ export function computeAStarRoute(startX_m, startZ_m, goalX_m, goalZ_m) {
       path_m.push([Number(goalX_m.toFixed(1)), Number(goalZ_m.toFixed(1))]);
     } else {
       const idx = rawIndices[i];
-      const ix  = idx % GN;
-      const iz  = (idx / GN) | 0;
+      const ix = idx % GN;
+      const iz = (idx / GN) | 0;
       path_m.push([Number(toWorldX(ix).toFixed(1)), Number(toWorldZ(iz).toFixed(1))]);
     }
   }
@@ -1672,7 +1672,7 @@ export function computeAStarRoute(startX_m, startZ_m, goalX_m, goalZ_m) {
 
   const routeObj = {
     dataset_id: state.datasetId || CONFIG.DEFAULT_DATASET,
-    algorithm:  'astar',
+    algorithm: 'astar',
     path_m,
     metrics,
   };
@@ -1690,11 +1690,11 @@ export function computeAStarRoute(startX_m, startZ_m, goalX_m, goalZ_m) {
 function evaluatePathMetrics(path_m) {
   const walkSpeed_ms = Math.max(state.fisio.walk_speed_ms || 1.2, 0.2);
   const baseRate_l_s = (state.fisio.o2_base_consumption_l_per_h || 50.0) / 3600.0;
-  const maxSafeDeg   = state.fisio.max_safe_slope_deg || 25;
+  const maxSafeDeg = state.fisio.max_safe_slope_deg || 25;
 
   let totalDist_m = 0;
-  let totalO2_l   = 0;
-  let maxSlope    = 0;
+  let totalO2_l = 0;
+  let maxSlope = 0;
   let weightedRiskSum = 0;
 
   for (let i = 1; i < path_m.length; i++) {
@@ -1716,23 +1716,23 @@ function evaluatePathMetrics(path_m) {
 
     if (segSlope > maxSlope) maxSlope = segSlope;
 
-    const sFactor   = getSlopeCostFactor(segSlope, dElev_m);
-    const cGrade    = dElev_m / segDist_m;
-    const cBonus    = cGrade > 0 ? 1.0 + cGrade * 4.5 : Math.max(0.8, 1.0 + cGrade * 0.8);
+    const sFactor = getSlopeCostFactor(segSlope, dElev_m);
+    const cGrade = dElev_m / segDist_m;
+    const cBonus = cGrade > 0 ? 1.0 + cGrade * 4.5 : Math.max(0.8, 1.0 + cGrade * 0.8);
     const segTime_s = segDist_m / walkSpeed_ms;
-    const segO2_l   = baseRate_l_s * sFactor * cBonus * segTime_s;
+    const segO2_l = baseRate_l_s * sFactor * cBonus * segTime_s;
 
     totalDist_m += segDist_m;
-    totalO2_l   += segO2_l;
+    totalO2_l += segO2_l;
     weightedRiskSum += THREE.MathUtils.clamp(segSlope / maxSafeDeg, 0, 1) * segDist_m;
   }
 
   const riskScore = totalDist_m > 0 ? weightedRiskSum / totalDist_m : 0;
   return {
-    distance_m:    Number(totalDist_m.toFixed(1)),
-    oxygen_l:      Number(totalO2_l.toFixed(2)),
+    distance_m: Number(totalDist_m.toFixed(1)),
+    oxygen_l: Number(totalO2_l.toFixed(2)),
     max_slope_deg: Number(maxSlope.toFixed(1)),
-    risk_score:    Number(riskScore.toFixed(2)),
+    risk_score: Number(riskScore.toFixed(2)),
   };
 }
 
@@ -1749,7 +1749,7 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
   const d_m = state.terrainDepth;
   const walkSpeed_ms = Math.max(state.fisio.walk_speed_ms || 1.2, 0.2);
   const baseRate_l_s = (state.fisio.o2_base_consumption_l_per_h || 50.0) / 3600.0;
-  const maxSafeDeg   = state.fisio.max_safe_slope_deg || 25;
+  const maxSafeDeg = state.fisio.max_safe_slope_deg || 25;
 
   const dx = goalX_m - startX_m;
   const dz = goalZ_m - startZ_m;
@@ -1770,7 +1770,7 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
   const ux = dx / directDist_m;
   const uz = dz / directDist_m;
   const vx = -uz;
-  const vz =  ux;
+  const vz = ux;
 
   /* Número de etapas longitudinales S y estados cuánticos transversales K por etapa */
   const S = Math.max(18, Math.min(48, Math.round(directDist_m / Math.max(80, Math.min(w_m, d_m) * 0.015))));
@@ -1804,7 +1804,7 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
         const lat_m = ratio * halfCorridor_m * env;
         const nx = clampX(baseX + vx * lat_m);
         const nz = clampZ(baseZ + vz * lat_m);
-        const elev  = sampleDemHeightRelM(nx, nz) ?? 0;
+        const elev = sampleDemHeightRelM(nx, nz) ?? 0;
         const slope = sampleSlopeDeg(nx, nz);
         layerNodes.push({ x: nx, z: nz, elev, slope, offsetRatio: ratio });
       }
@@ -1826,9 +1826,9 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
       Math.atan(Math.abs(dElev) / segDist) * (180 / Math.PI)
     );
 
-    const sFactor  = getSlopeCostFactor(segSlope, dElev);
-    const cGrade   = dElev / segDist;
-    const cBonus   = cGrade > 0 ? 1.0 + cGrade * 4.5 : Math.max(0.8, 1.0 + cGrade * 0.8);
+    const sFactor = getSlopeCostFactor(segSlope, dElev);
+    const cGrade = dElev / segDist;
+    const cBonus = cGrade > 0 ? 1.0 + cGrade * 4.5 : Math.max(0.8, 1.0 + cGrade * 0.8);
     const o2Cost_l = baseRate_l_s * sFactor * cBonus * (segDist / walkSpeed_ms);
 
     /* Término cuadrático QUBO de contorno topográfico y penalización de pendiente insegura:
@@ -1843,7 +1843,7 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
     }
 
     const lateralJump = Math.abs((nb.offsetRatio || 0) - (na.offsetRatio || 0));
-    const smoothTerm  = 1.0 + lateralJump * lateralJump * 0.45;
+    const smoothTerm = 1.0 + lateralJump * lateralJump * 0.45;
     return o2Cost_l * hPenalty * smoothTerm;
   };
 
@@ -1863,12 +1863,12 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
   for (let p = 0; p < pLayers.length; p++) {
     const { gamma, beta } = pLayers[p];
     for (let s = 1; s < S; s++) {
-      const curNodes  = layers[s];
+      const curNodes = layers[s];
       const prevNodes = layers[s - 1];
       const nextNodes = layers[s + 1];
-      const curW      = weights[s];
-      const prevW     = weights[s - 1];
-      const nextW     = weights[s + 1];
+      const curW = weights[s];
+      const prevW = weights[s - 1];
+      const nextW = weights[s + 1];
 
       const effEnergy = new Float64Array(curNodes.length);
       let minE = Infinity;
@@ -1895,9 +1895,9 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
 
       let sumW = 0;
       for (let k = 0; k < curNodes.length; k++) {
-        const leftW  = k > 0 ? rawUpdated[k - 1] : rawUpdated[k];
+        const leftW = k > 0 ? rawUpdated[k - 1] : rawUpdated[k];
         const rightW = k < curNodes.length - 1 ? rawUpdated[k + 1] : rawUpdated[k];
-        const mixed  = (1 - beta) * rawUpdated[k] + (beta * 0.5) * (leftW + rightW);
+        const mixed = (1 - beta) * rawUpdated[k] + (beta * 0.5) * (leftW + rightW);
         curW[k] = mixed;
         sumW += mixed;
       }
@@ -1913,9 +1913,9 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
   dpCost[0][0] = 0;
 
   for (let s = 1; s <= S; s++) {
-    const curNodes  = layers[s];
+    const curNodes = layers[s];
     const prevNodes = layers[s - 1];
-    const curW      = weights[s];
+    const curW = weights[s];
 
     for (let k = 0; k < curNodes.length; k++) {
       /* Sesgo cuántico de estado: favorece nodos con alta amplitud variacional post-QAOA */
@@ -1958,7 +1958,7 @@ export function computeQAOARoute(startX_m, startZ_m, goalX_m, goalZ_m) {
 
   const qaoaObj = {
     dataset_id: state.datasetId || CONFIG.DEFAULT_DATASET,
-    algorithm:  'qaoa',
+    algorithm: 'qaoa',
     path_m,
     metrics,
   };
@@ -1990,29 +1990,33 @@ export function recomputeRoutesForCurrentWaypoints() {
   } else {
     /* Modo 'compare': calcular tanto A* como QAOA para superponerlos y comparar métricas */
     const astar = computeAStarRoute(sx, sz, gx, gz);
-    const qaoa  = computeQAOARoute(sx, sz, gx, gz);
-    state.route     = astar;
+    const qaoa = computeQAOARoute(sx, sz, gx, gz);
+    state.route = astar;
     state.qaoaRoute = qaoa;
   }
   rebuildRoute3DMesh();
   renderRouteMetricsUI();
+  state.hooks.onRouteUpdated?.();
 }
 
 export function applyRouteToScene(routeObj) {
   state.route = routeObj;
   if (routeObj && Array.isArray(routeObj.path_m) && routeObj.path_m.length >= 2) {
     state.routeStart_m = routeObj.path_m[0].slice();
-    state.routeGoal_m  = routeObj.path_m[routeObj.path_m.length - 1].slice();
+    state.routeGoal_m = routeObj.path_m[routeObj.path_m.length - 1].slice();
   }
   rebuildRoute3DMesh();
   renderRouteMetricsUI();
+  if (routeObj?.algorithm !== 'health') {
+    state.hooks.onRouteUpdated?.();
+  }
 }
 
 export function clearRoute() {
-  state.route           = null;
-  state.qaoaRoute       = null;
-  state.routeStart_m    = null;
-  state.routeGoal_m     = null;
+  state.route = null;
+  state.qaoaRoute = null;
+  state.routeStart_m = null;
+  state.routeGoal_m = null;
   state.routeSelectMode = null;
   if (state.routeGroup) {
     scene.remove(state.routeGroup);
@@ -2026,7 +2030,7 @@ export function clearRoute() {
 }
 
 let routeArrowTexture = null;
-let qaoaArrowTexture  = null;
+let qaoaArrowTexture = null;
 
 function getRouteArrowTexture() {
   if (routeArrowTexture) return routeArrowTexture;
@@ -2035,7 +2039,7 @@ function getRouteArrowTexture() {
   const w = 128;
   const h = 256;
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, w, h);
@@ -2050,11 +2054,11 @@ function getRouteArrowTexture() {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = color;
-    ctx.lineWidth   = 14;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+    ctx.lineWidth = 14;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.shadowColor = '#66fcf1';
-    ctx.shadowBlur  = 12;
+    ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.moveTo(26, cy + 34);
     ctx.lineTo(w * 0.5, cy - 22);
@@ -2082,7 +2086,7 @@ function getQAOAArrowTexture() {
   const w = 128;
   const h = 256;
   const c = document.createElement('canvas');
-  c.width  = w;
+  c.width = w;
   c.height = h;
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, w, h);
@@ -2095,11 +2099,11 @@ function getQAOAArrowTexture() {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = color;
-    ctx.lineWidth   = 14;
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+    ctx.lineWidth = 14;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.shadowColor = '#d875ff';
-    ctx.shadowBlur  = 14;
+    ctx.shadowBlur = 14;
     ctx.beginPath();
     ctx.moveTo(26, cy + 34);
     ctx.lineTo(w * 0.5, cy - 22);
@@ -2159,9 +2163,9 @@ function createGroundProjectedRibbonGeometry(rawPath, width_m, step_m, lift_m, r
   if (n < 2) return null;
 
   const positions = new Float32Array(n * 2 * 3);
-  const uvs       = new Float32Array(n * 2 * 2);
-  const indices   = new Uint32Array((n - 1) * 6);
-  const halfW     = width_m * 0.5;
+  const uvs = new Float32Array(n * 2 * 2);
+  const indices = new Uint32Array((n - 1) * 6);
+  const halfW = width_m * 0.5;
 
   for (let i = 0; i < n; i++) {
     const pPrev = spine[Math.max(0, i - 1)];
@@ -2174,13 +2178,13 @@ function createGroundProjectedRibbonGeometry(rawPath, width_m, step_m, lift_m, r
 
     /* Perpendicular en el plano horizontal XZ: (-tz, tx) */
     const nx = -tz;
-    const nz =  tx;
+    const nz = tx;
 
     const cur = spine[i];
-    const lx  = cur.x - nx * halfW;
-    const lz  = cur.z - nz * halfW;
-    const rx  = cur.x + nx * halfW;
-    const rz  = cur.z + nz * halfW;
+    const lx = cur.x - nx * halfW;
+    const lz = cur.z - nz * halfW;
+    const rx = cur.x + nx * halfW;
+    const rz = cur.z + nz * halfW;
 
     /* Muestrear la altura exacta de cada borde de la cinta para que quede pegada al suelo incluso en ladera */
     const ly = (sampleGroundY(lx, lz) ?? cur.y) + lift_m;
@@ -2189,7 +2193,7 @@ function createGroundProjectedRibbonGeometry(rawPath, width_m, step_m, lift_m, r
     const vCoord = cur.d / repeatLen_m;
 
     const vOff = i * 6;
-    positions[vOff]     = lx;
+    positions[vOff] = lx;
     positions[vOff + 1] = ly;
     positions[vOff + 2] = lz;
     positions[vOff + 3] = rx;
@@ -2197,7 +2201,7 @@ function createGroundProjectedRibbonGeometry(rawPath, width_m, step_m, lift_m, r
     positions[vOff + 5] = rz;
 
     const uOff = i * 4;
-    uvs[uOff]     = 0;
+    uvs[uOff] = 0;
     uvs[uOff + 1] = vCoord;
     uvs[uOff + 2] = 1;
     uvs[uOff + 3] = vCoord;
@@ -2205,7 +2209,7 @@ function createGroundProjectedRibbonGeometry(rawPath, width_m, step_m, lift_m, r
     if (i < n - 1) {
       const base = i * 2;
       const iOff = i * 6;
-      indices[iOff]     = base;
+      indices[iOff] = base;
       indices[iOff + 1] = base + 2;
       indices[iOff + 2] = base + 1;
       indices[iOff + 3] = base + 1;
@@ -2350,9 +2354,9 @@ export function updateRouteViewMode() {
   if (!state.routeGroup) return;
   const isFP = state.mode === 'fp';
   const orb = state.routeGroup.getObjectByName('orbitalRouteVisuals');
-  const fp  = state.routeGroup.getObjectByName('fpRouteVisuals');
+  const fp = state.routeGroup.getObjectByName('fpRouteVisuals');
   if (orb) orb.visible = !isFP;
-  if (fp)  fp.visible  = isFP;
+  if (fp) fp.visible = isFP;
 }
 
 export function tickRouteAnimation(dt) {
@@ -2446,7 +2450,7 @@ function initDatasetAndUncertaintyUI(currentDatasetId, metadata) {
     });
   }
 
-  const srcEl  = document.getElementById('meta-source-line');
+  const srcEl = document.getElementById('meta-source-line');
   const noteEl = document.getElementById('meta-uncertainty-note');
   if (srcEl) {
     const resStr = typeof metadata.resolution_m === 'number' ? `${metadata.resolution_m} m/px` : '—';
@@ -2462,12 +2466,12 @@ function initDatasetAndUncertaintyUI(currentDatasetId, metadata) {
 }
 
 function initRoutePlannerUI() {
-  const pickBtn     = document.getElementById('route-pick-btn');
-  const clearBtn    = document.getElementById('route-clear-btn');
-  const exportBtn   = document.getElementById('route-export-btn');
-  const sciTourBtn  = document.getElementById('route-science-tour-btn');
-  const algoAstar   = document.getElementById('algo-astar');
-  const algoQaoa    = document.getElementById('algo-qaoa');
+  const pickBtn = document.getElementById('route-pick-btn');
+  const clearBtn = document.getElementById('route-clear-btn');
+  const exportBtn = document.getElementById('route-export-btn');
+  const sciTourBtn = document.getElementById('route-science-tour-btn');
+  const algoAstar = document.getElementById('algo-astar');
+  const algoQaoa = document.getElementById('algo-qaoa');
   const algoCompare = document.getElementById('algo-compare');
 
   if (sciTourBtn) {
@@ -2478,8 +2482,8 @@ function initRoutePlannerUI() {
 
   const setAlgoMode = (mode) => {
     state.routeAlgorithm = mode;
-    if (algoAstar)   algoAstar.classList.toggle('active', mode === 'astar');
-    if (algoQaoa)    algoQaoa.classList.toggle('active', mode === 'qaoa');
+    if (algoAstar) algoAstar.classList.toggle('active', mode === 'astar');
+    if (algoQaoa) algoQaoa.classList.toggle('active', mode === 'qaoa');
     if (algoCompare) algoCompare.classList.toggle('active', mode === 'compare');
     if (state.routeStart_m && state.routeGoal_m) {
       recomputeRoutesForCurrentWaypoints();
@@ -2488,8 +2492,8 @@ function initRoutePlannerUI() {
     }
   };
 
-  if (algoAstar)   algoAstar.addEventListener('click', () => setAlgoMode('astar'));
-  if (algoQaoa)    algoQaoa.addEventListener('click', () => setAlgoMode('qaoa'));
+  if (algoAstar) algoAstar.addEventListener('click', () => setAlgoMode('astar'));
+  if (algoQaoa) algoQaoa.addEventListener('click', () => setAlgoMode('qaoa'));
   if (algoCompare) algoCompare.addEventListener('click', () => setAlgoMode('compare'));
 
   if (pickBtn) {
@@ -2514,9 +2518,9 @@ function initRoutePlannerUI() {
       const activeRoute = state.routeAlgorithm === 'qaoa' ? (state.qaoaRoute || state.route) : state.route;
       if (!activeRoute) return;
       const blob = new Blob([JSON.stringify(activeRoute, null, 2)], { type: 'application/json' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
       a.download = 'route.json';
       a.click();
       URL.revokeObjectURL(url);
@@ -2527,13 +2531,13 @@ function initRoutePlannerUI() {
 }
 
 export function renderRouteMetricsUI() {
-  const pickBtn    = document.getElementById('route-pick-btn');
-  const statusEl   = document.getElementById('route-status');
-  const distEl     = document.getElementById('rm-dist');
-  const o2El       = document.getElementById('rm-o2');
-  const slopeEl    = document.getElementById('rm-slope');
-  const riskEl     = document.getElementById('rm-risk');
-  const algoEl     = document.getElementById('rm-algo');
+  const pickBtn = document.getElementById('route-pick-btn');
+  const statusEl = document.getElementById('route-status');
+  const distEl = document.getElementById('rm-dist');
+  const o2El = document.getElementById('rm-o2');
+  const slopeEl = document.getElementById('rm-slope');
+  const riskEl = document.getElementById('rm-risk');
+  const algoEl = document.getElementById('rm-algo');
   const compareBox = document.getElementById('route-compare-box');
 
   if (!statusEl) return;
@@ -2543,8 +2547,8 @@ export function renderRouteMetricsUI() {
     pickBtn.textContent = state.routeSelectMode === 'start'
       ? '1/2 Clic en Inicio (A)…'
       : state.routeSelectMode === 'goal'
-      ? '2/2 Clic en Destino (B)…'
-      : '📍 Elegir Inicio / Destino';
+        ? '2/2 Clic en Destino (B)…'
+        : '📍 Elegir Inicio / Destino';
   }
 
   const shownRoute = state.routeAlgorithm === 'qaoa' ? (state.qaoaRoute || state.route) : state.route;
@@ -2580,17 +2584,17 @@ export function renderRouteMetricsUI() {
 
   if (shownRoute && shownRoute.metrics) {
     const m = shownRoute.metrics;
-    distEl.textContent  = m.distance_m >= 1000 ? `${(m.distance_m / 1000).toFixed(2)} km` : `${m.distance_m.toFixed(0)} m`;
-    o2El.textContent    = `${m.oxygen_l.toFixed(1)} L`;
+    distEl.textContent = m.distance_m >= 1000 ? `${(m.distance_m / 1000).toFixed(2)} km` : `${m.distance_m.toFixed(0)} m`;
+    o2El.textContent = `${m.oxygen_l.toFixed(1)} L`;
     slopeEl.textContent = `${m.max_slope_deg.toFixed(1)}°`;
     slopeEl.style.color = m.max_slope_deg > state.fisio.max_safe_slope_deg ? '#ff3855' : '#55f29b';
-    riskEl.textContent  = m.risk_score.toFixed(2);
+    riskEl.textContent = m.risk_score.toFixed(2);
   } else {
-    distEl.textContent  = '—';
-    o2El.textContent    = '—';
+    distEl.textContent = '—';
+    o2El.textContent = '—';
     slopeEl.textContent = '—';
     slopeEl.style.color = '';
-    riskEl.textContent  = '—';
+    riskEl.textContent = '—';
   }
 
   /* Cuadro comparativo A* vs QAOA cuando está activo el modo 'compare' */
@@ -2639,10 +2643,10 @@ export function computeScienceMultiPOITour() {
     let bestDist = Infinity;
     for (let i = 0; i < remaining.length; i++) {
       const pt = remaining[i].position_m;
-      const d  = Math.hypot(pt[0] - curr[0], pt[1] - curr[1]);
+      const d = Math.hypot(pt[0] - curr[0], pt[1] - curr[1]);
       if (d < bestDist) {
         bestDist = d;
-        bestIdx  = i;
+        bestIdx = i;
       }
     }
     const chosen = remaining.splice(bestIdx, 1)[0];
@@ -2664,20 +2668,20 @@ export function computeScienceMultiPOITour() {
     }
     return {
       dataset_id: state.datasetId || CONFIG.DEFAULT_DATASET,
-      algorithm:  algoTag,
-      path_m:     fullPath,
-      metrics:    evaluatePathMetrics(fullPath),
+      algorithm: algoTag,
+      path_m: fullPath,
+      metrics: evaluatePathMetrics(fullPath),
     };
   };
 
   state.routeStart_m = waypoints[0].slice();
-  state.routeGoal_m  = waypoints[waypoints.length - 1].slice();
+  state.routeGoal_m = waypoints[waypoints.length - 1].slice();
 
   if (state.routeAlgorithm === 'qaoa') {
     state.qaoaRoute = buildChain(computeQAOARoute, 'qaoa');
-    state.route     = state.qaoaRoute;
+    state.route = state.qaoaRoute;
   } else if (state.routeAlgorithm === 'compare') {
-    state.route     = buildChain(computeAStarRoute, 'astar');
+    state.route = buildChain(computeAStarRoute, 'astar');
     state.qaoaRoute = buildChain(computeQAOARoute, 'qaoa');
   } else {
     state.route = buildChain(computeAStarRoute, 'astar');
@@ -2694,26 +2698,26 @@ function drawRouteElevationProfile() {
   const canvas = document.getElementById('route-profile-canvas');
   if (!canvas || !state.metadata) return;
   const ctx = canvas.getContext('2d');
-  const w   = canvas.width;
-  const h   = canvas.height;
+  const w = canvas.width;
+  const h = canvas.height;
 
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = 'rgba(6, 14, 18, 0.92)';
   ctx.fillRect(0, 0, w, h);
 
   const primaryRoute = state.routeAlgorithm === 'qaoa' ? (state.qaoaRoute || state.route) : state.route;
-  const compareQaoa  = state.routeAlgorithm === 'compare' ? state.qaoaRoute : null;
+  const compareQaoa = state.routeAlgorithm === 'compare' ? state.qaoaRoute : null;
 
   if (!primaryRoute || !Array.isArray(primaryRoute.path_m) || primaryRoute.path_m.length < 2) {
     ctx.fillStyle = '#6c7a89';
-    ctx.font      = '10px system-ui, sans-serif';
+    ctx.font = '10px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Traza una ruta para ver el perfil 2D', w * 0.5, h * 0.54);
     return;
   }
 
   const minElevBase = state.metadata.elevation_range_m[0];
-  const maxSafeDeg  = state.fisio.max_safe_slope_deg || 25;
+  const maxSafeDeg = state.fisio.max_safe_slope_deg || 25;
 
   /* Muestrear una polilínea en distancias acumuladas y elevaciones reales (m) */
   const sampleProfile = (path_m) => {
@@ -2724,7 +2728,7 @@ function drawRouteElevationProfile() {
       if (i > 0) {
         dAcc += Math.hypot(x - path_m[i - 1][0], z - path_m[i - 1][1]);
       }
-      const elev_m    = minElevBase + (sampleDemHeightRelM(x, z) ?? 0);
+      const elev_m = minElevBase + (sampleDemHeightRelM(x, z) ?? 0);
       const slope_deg = sampleSlopeDeg(x, z);
       pts.push({ x, z, d: dAcc, elev: elev_m, slope: slope_deg });
     }
@@ -2758,7 +2762,7 @@ function drawRouteElevationProfile() {
 
   /* Líneas horizontales de referencia */
   ctx.strokeStyle = 'rgba(102, 252, 241, 0.12)';
-  ctx.lineWidth   = 1;
+  ctx.lineWidth = 1;
   for (const frac of [0.25, 0.5, 0.75]) {
     const gy = padT + plotH * frac;
     ctx.beginPath();
@@ -2785,8 +2789,8 @@ function drawRouteElevationProfile() {
     ctx.strokeStyle = segSlope > maxSafeDeg
       ? '#ff3855'
       : segSlope > maxSafeDeg * 0.75
-      ? '#f6c945'
-      : primaryColor;
+        ? '#f6c945'
+        : primaryColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(toX(p0.d), toY(p0.elev));
@@ -2797,7 +2801,7 @@ function drawRouteElevationProfile() {
   /* Si está en modo comparar, superponer la curva QAOA en magenta */
   if (profQ && profQ.length >= 2) {
     ctx.strokeStyle = '#d875ff';
-    ctx.lineWidth   = 1.8;
+    ctx.lineWidth = 1.8;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
     for (let i = 0; i < profQ.length; i++) {
@@ -2820,7 +2824,7 @@ function drawRouteElevationProfile() {
         const d = Math.hypot(p.x - poi.position_m[0], p.z - poi.position_m[1]);
         if (d < bestDist) {
           bestDist = d;
-          bestPt   = p;
+          bestPt = p;
         }
       }
       if (bestPt) {
@@ -2836,7 +2840,7 @@ function drawRouteElevationProfile() {
 
   /* Etiquetas de elevación mín/máx y distancia total */
   ctx.fillStyle = '#9aa6b5';
-  ctx.font      = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
   ctx.textAlign = 'left';
   ctx.fillText(`${maxE.toFixed(0)}m`, 6, 10);
   ctx.fillText(`${minE.toFixed(0)}m`, 6, h - 3);
@@ -2869,8 +2873,8 @@ async function loadDefaultRouteIfPresent(baseDir) {
 /* ------------------------------------------------ POIs y Ciencia (T9) */
 const POI_COLORS = {
   sampling: 0x66fcf1, // Cian: sitio de muestreo científico
-  hazard:   0xff3855, // Rojo: peligro / terreno hostil
-  shelter:  0x55f29b, // Verde: refugio / base EVA
+  hazard: 0xff3855, // Rojo: peligro / terreno hostil
+  shelter: 0x55f29b, // Verde: refugio / base EVA
 };
 
 async function loadPOIsIfPresent(baseDir) {
@@ -2898,12 +2902,12 @@ async function loadPOIsIfPresent(baseDir) {
   /* Registrar POIs como capa activable con la interfaz común de T6 (sección 5 y T9) */
   if (!state.layers.some((l) => l.id === 'pois')) {
     const poiLayerObj = {
-      id:      'pois',
-      label:   'POIs Ciencia',
-      type:    'poi3d',
+      id: 'pois',
+      label: 'POIs Ciencia',
+      type: 'poi3d',
       enabled: state.poiLayerEnabled,
       opacity: state.poiLayerOpacity,
-      source:  null,
+      source: null,
       enable() {
         this.enabled = true;
         state.poiLayerEnabled = true;
@@ -3041,9 +3045,9 @@ export function updatePOIViewMode() {
   if (!state.poiGroup) return;
   const isFP = state.mode === 'fp';
   const orb = state.poiGroup.getObjectByName('orbitalPOIs');
-  const fp  = state.poiGroup.getObjectByName('fpPOIs');
+  const fp = state.poiGroup.getObjectByName('fpPOIs');
   if (orb) orb.visible = !isFP;
-  if (fp)  fp.visible  = true; // Siempre visibles a escala 1:1 (en 1ª persona y al hacer zoom orbital cercano)
+  if (fp) fp.visible = true; // Siempre visibles a escala 1:1 (en 1ª persona y al hacer zoom orbital cercano)
 }
 
 export function updatePOI3DHeights() {
@@ -3073,17 +3077,17 @@ export function generateAutoPOIsFromDEM() {
 
   let bestShelter = { x: 0, z: 0, score: Infinity };
   let bestLowBasin = { x: -w_m * 0.15, z: d_m * 0.12, elev: Infinity };
-  let bestContact  = { x: w_m * 0.16, z: -d_m * 0.14, score: -Infinity };
-  let bestRidge    = { x: -w_m * 0.22, z: -d_m * 0.18, elev: -Infinity };
-  let bestHazard   = { x: w_m * 0.08, z: d_m * 0.18, slope: -Infinity };
+  let bestContact = { x: w_m * 0.16, z: -d_m * 0.14, score: -Infinity };
+  let bestRidge = { x: -w_m * 0.22, z: -d_m * 0.18, elev: -Infinity };
+  let bestHazard = { x: w_m * 0.08, z: d_m * 0.18, slope: -Infinity };
 
   const G = 24;
   for (let iz = 2; iz < G - 2; iz++) {
     const z_m = ((iz / (G - 1)) - 0.5) * d_m * 0.78;
     for (let ix = 2; ix < G - 2; ix++) {
       const x_m = ((ix / (G - 1)) - 0.5) * w_m * 0.78;
-      const sl  = sampleSlopeDeg(x_m, z_m);
-      const el  = sampleDemHeightRelM(x_m, z_m) ?? 0;
+      const sl = sampleSlopeDeg(x_m, z_m);
+      const el = sampleDemHeightRelM(x_m, z_m) ?? 0;
       const distCenter = Math.hypot(x_m / w_m, z_m / d_m);
 
       /* 1. Refugio: pendiente mínima cerca del centro */
@@ -3202,9 +3206,9 @@ export async function loadCustomDemInRealtime({
     elevation_range_m: [Number(minElev.toFixed(2)), Number(maxElev.toFixed(2))],
     heightmap: { file: 'heightmap.f32', format: 'float32-le', units: 'm' },
     layers: [
-      { id: 'base',  file: '', type: 'base' },
+      { id: 'base', file: '', type: 'base' },
       { id: 'slope', file: '', type: 'overlay', unit: 'deg', range: [0, 45] },
-      { id: 'risk',  file: '', type: 'overlay', unit: '0-1' },
+      { id: 'risk', file: '', type: 'overlay', unit: '0-1' },
     ],
     acquisition_date: new Date().toISOString().slice(0, 10),
     uncertainty_note:
@@ -3213,9 +3217,9 @@ export async function loadCustomDemInRealtime({
   };
 
   state.datasetId = datasetId;
-  state.metadata  = metadata;
-  state.dem       = demFloat32;
-  document.title  = `${label} · Marswalk 3D`;
+  state.metadata = metadata;
+  state.dem = demFloat32;
+  document.title = `${label} · Marswalk 3D`;
 
   initDatasetAndUncertaintyUI(datasetId, metadata);
 
@@ -3231,12 +3235,12 @@ export async function loadCustomDemInRealtime({
 
   if (!state.layers.some((l) => l.id === 'pois')) {
     state.layers.push({
-      id:      'pois',
-      label:   'POIs Ciencia',
-      type:    'poi3d',
+      id: 'pois',
+      label: 'POIs Ciencia',
+      type: 'poi3d',
       enabled: state.poiLayerEnabled,
       opacity: state.poiLayerOpacity,
-      source:  null,
+      source: null,
       enable() {
         this.enabled = true;
         state.poiLayerEnabled = true;
@@ -3262,10 +3266,10 @@ export async function loadCustomDemInRealtime({
 
   /* Trazar ruta automática entre el Refugio detectado (A) y la Cuenca de Muestreo (B) */
   const shelterPOI = state.pois.find((p) => p.type === 'shelter') || state.pois[0];
-  const samplePOI  = state.pois.find((p) => p.type === 'sampling') || state.pois[1];
+  const samplePOI = state.pois.find((p) => p.type === 'sampling') || state.pois[1];
   if (shelterPOI && samplePOI) {
     state.routeStart_m = shelterPOI.position_m.slice();
-    state.routeGoal_m  = samplePOI.position_m.slice();
+    state.routeGoal_m = samplePOI.position_m.slice();
     recomputeRoutesForCurrentWaypoints();
   }
 
@@ -3288,4 +3292,15 @@ function showLoadingError(msg, sub = '') {
   const spinner = el.querySelector('.spinner');
   if (spinner) spinner.style.display = 'none';
   setLoadingStatus(`⚠ ${msg}`, sub);
+}
+/* Fase G2.5 — recalcular ruta con coste ponderado por salud.
+ * Llamar tras computeAStarRoute original. Si routeCostMode === 'oxygen', es no-op. */
+export function applyHealthRouteCost(path_m, dem) {
+  if (!state.health || state.routeCostMode === 'oxygen') {
+    state.healthRouteResult = null;
+    return null;
+  }
+  const result = computeHealthOptimalRoute(path_m, dem, state.health, state.routeCostMode);
+  state.healthRouteResult = result;
+  return result;
 }

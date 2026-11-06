@@ -2359,3 +2359,157 @@ body.fp .group-status-panel {
 body:not(.fp) .group-status-panel {
   display: none !important;
 }
+
+.group-status-extra {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(102, 252, 241, 0.25);
+  font-size: 9px;
+  color: #f6c945;
+  opacity: 0.85;
+}
+
+/* === Comparador clásico vs salud === */
+.health-route-compare {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(102, 252, 241, 0.25);
+  padding-top: 6px;
+}
+
+.health-route-summary {
+  cursor: pointer;
+  padding: 4px 0;
+  color: #66fcf1;
+  font-weight: 700;
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+}
+
+.health-route-summary::-webkit-details-marker {
+  display: none;
+}
+
+.hrc-status {
+  color: #f6c945;
+  font-weight: 400;
+  font-size: 10px;
+}
+
+.hrc-body {
+  padding-top: 6px;
+}
+
+.hrc-field {
+  margin-bottom: 8px;
+}
+
+.hrc-field>label {
+  display: block;
+  font-size: 10px;
+  color: #a0c4c2;
+  margin-bottom: 3px;
+  letter-spacing: 0.05em;
+}
+
+.hrc-checkboxes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 8px;
+}
+
+.hrc-cb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #c5f8f3;
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 2px;
+}
+
+.hrc-cb:hover {
+  background: rgba(102, 252, 241, 0.06);
+}
+
+.hrc-cb input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.hrc-table-wrap {
+  margin-top: 10px;
+}
+
+.hrc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  font-family: ui-monospace, monospace;
+}
+
+.hrc-table th {
+  text-align: left;
+  padding: 3px 4px;
+  color: #f6c945;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(102, 252, 241, 0.3);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.hrc-table td {
+  padding: 2px 4px;
+  color: #c5f8f3;
+}
+
+.hrc-table tr:nth-child(even) td {
+  background: rgba(102, 252, 241, 0.04);
+}
+
+.hrc-table .delta-good {
+  color: #55f29b;
+  font-weight: 700;
+}
+
+.hrc-table .delta-bad {
+  color: #ff3855;
+  font-weight: 700;
+}
+
+.hrc-table .delta-neutral {
+  color: #a0c4c2;
+}
+
+.hrc-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.hrc-actions button {
+  flex: 1;
+  font-size: 10px;
+  padding: 4px 6px;
+}
+
+.hrc-actions button.active {
+  background: rgba(102, 252, 241, 0.22);
+  border-color: #66fcf1;
+  color: #66fcf1;
+  box-shadow: 0 0 8px rgba(102, 252, 241, 0.35);
+}
+
+.hrc-verdict {
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid rgba(102, 252, 241, 0.25);
+  background: rgba(6, 16, 20, 0.7);
+  font-size: 10px;
+  color: #f6c945;
+  border-radius: 3px;
+  line-height: 1.4;
+}

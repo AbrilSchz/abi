@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { state } from './state.js';
 import { renderer, scene, camera, stars } from './scene.js';
 import { loadHeightmap, tickRouteAnimation, updateSolarCycle } from './terrain.js';
-import { initAstronaut, spawnAstronaut } from './astronaut.js';
+import { initAstronaut } from './astronaut.js';
 import { initPopup, tickPopup } from './popup.js';
 import { initControls, updateControls } from './controls.js';
 import { benchmarkGroundSampling } from './raycast.js';
@@ -50,7 +50,7 @@ const clock = new THREE.Clock();
   /* 2. Cargar terreno */
   await loadHeightmap();
   benchmarkGroundSampling(200);
-  initHealthState();
+  await initHealthState();
   /* 3. Inicializar astronauta (dock + drag) */
   initAstronaut();
 

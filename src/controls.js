@@ -1,18 +1,21 @@
-/* OrbitControls + PointerLockControls + salto + transiciones + Visor HUD Sci-Fi (T7). */
+/* OrbitControls + PointerLockControls + salto + transiciones + Visor HUD Sci-Fi (T7).
+ * Fase G1: HUD GROUP_STATUS + avance de salud por frame.
+ * Fase G2: T_core + deshidratación en HUD, selector de modo de ruta (tecla M). */
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-
 import { camera, renderer } from './scene.js';
 import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { sampleGroundY, sampleDemHeightRelM, sampleSlopeDeg, getSlopeCostFactor } from './raycast.js';
-import { applyHeights, enableLocalPatch, updateLocalPatchIfNeeded, disableLocalPatch, toggleDustStormSimulation, computeEmergencyEvacuationRoute } from './terrain.js';
-import { spawnAstronaut, recallAstronaut } from './astronaut.js';
+import { applyHeights, enableLocalPatch, updateLocalPatchIfNeeded, disableLocalPatch, toggleDustStormSimulation, computeEmergencyEvacuationRoute, applyRouteToScene } from './terrain.js';
+import { spawnAstronaut } from './astronaut.js';
 import { hideInfoPopup, syncPopupHeight } from './popup.js';
 import { queryAresCopilot, showTransmissionOnHUD, speakCopilotRadio } from './copilot.js';
-import { advanceGroupState, aggregateGroupState } from './health_group.js';
+/* === G1 === */
+import { advanceGroupState, aggregateGroupState, createSoloHealth } from './health_group.js';
+import { computeHealthAwareRoute, compareRoutes, PRESETS } from './health_route_astar.js';
 const modeBtn = document.getElementById('mode-btn');
 const hintEl = document.querySelector('.hint');
 const hSlider = document.getElementById('h-slider');
@@ -151,6 +154,15 @@ export function initControls() {
         e.preventDefault();
         triggerCopilotRadioComms();
       }
+      /* === G2 === */
+      if (e.code === 'KeyM' && !e.repeat) {
+        e.preventDefault();
+        const modes = ['oxygen', 'health', 'balanced'];
+        const idx = modes.indexOf(state.routeCostMode || 'oxygen');
+        state.routeCostMode = modes[(idx + 1) % modes.length];
+        console.log('[MarsWalk] Modo de coste de ruta:', state.routeCostMode);
+      }
+      /* === /G2 === */
     }
     keys.add(e.code);
   });
@@ -192,6 +204,7 @@ export function initControls() {
   };
 
   updateUI();
+  initHealthRouteComparator();
 }
 
 const keys = new Set();
@@ -220,7 +233,6 @@ export function enterFirstPerson(lookTarget = null) {
   camera.position.z = pz;
   camera.position.y = (groundY !== null ? groundY : state.astronautPosition.y) + state.fisio.eye_height_m;
 
-  /* Si hay un objetivo explícito o un POI/Rover cercano (< 40 m), orientar la mirada hacia él */
   let targetX = px * 0.7;
   let targetZ = pz * 0.7 - 1;
   if (lookTarget && typeof lookTarget.x === 'number' && typeof lookTarget.z === 'number') {
@@ -350,11 +362,9 @@ function updateFirstPerson(dt) {
     if (isGrounded) {
       const dy = targetY - camera.position.y;
       if (dy < -CONFIG.FALL_THRESHOLD_M) {
-        /* Caída desde un escalón → física */
         isGrounded = false;
         vy = 0;
       } else {
-        /* Seguimiento suave del terreno caminando */
         const k = 1 - Math.exp(-CONFIG.WALK_Y_SMOOTHING * dt);
         camera.position.y += dy * k;
       }
@@ -371,7 +381,6 @@ function updateFirstPerson(dt) {
       }
     }
 
-    /* Sincronizar astronauta (X/Z sigue al jugador; Y = suelo) */
     state.astronautPosition.set(camera.position.x, groundY, camera.position.z);
     if (state.astronautGroup) state.astronautGroup.position.copy(state.astronautPosition);
   }
@@ -386,24 +395,11 @@ function updateFirstPerson(dt) {
   const actualSpeed = dt > 1e-5 ? stepDist_m / dt : 0;
   const deltaElev_m = curElev_m - prevElev_m;
   const slope_deg = sampleSlopeDeg(curX_m, curZ_m);
-  /* --- Fase G1: avanzar estado de salud del grupo/solo --- */
-  if (state.health) {
-    const isMoving = stepDist_m > 0.01;
-    const segment = {
-      walking_time_h: dt / 3600,
-      slope_deg: isMoving ? slope_deg : 0,
-      delta_elev_m: isMoving ? deltaElev_m : 0,
-      surface_distance_m: isMoving ? stepDist_m : 0,
-      walk_speed_ms: isMoving ? actualSpeed : 0,
-    };
-    state.health = advanceGroupState(state.health, segment);
-    state.healthLastAggregate = aggregateGroupState(state.health);
-  }
-  /* Si está en movimiento: calcular pendiente direccional efectiva del paso + pendiente del terreno */
+
   const isMoving = stepDist_m > 1e-4;
   const baseRate_l_h = state.fisio.o2_base_consumption_l_per_h;
   const thermalMult = state.weather?.thermalPenalty || 1.0;
-  let o2Rate_l_h = baseRate_l_h * 0.45 * thermalMult; // tasa basal en reposo de pie (~22.5 L/h)
+  let o2Rate_l_h = baseRate_l_h * 0.45 * thermalMult;
 
   if (isMoving) {
     const slopeFactor = getSlopeCostFactor(slope_deg, deltaElev_m);
@@ -420,6 +416,22 @@ function updateFirstPerson(dt) {
   state.hud.speed_ms = actualSpeed;
   state.hud.o2Rate_l_h = o2Rate_l_h;
   state.hud.slopeWarning = slope_deg > state.fisio.max_safe_slope_deg;
+
+  /* === G1 + G2: avanzar estado de salud del grupo/solo === */
+  if (state.health) {
+    const isMovingForHealth = stepDist_m > 0.01;
+    const segment = {
+      walking_time_h: dt / 3600,
+      slope_deg: isMovingForHealth ? slope_deg : 0,
+      delta_elev_m: isMovingForHealth ? deltaElev_m : 0,
+      surface_distance_m: isMovingForHealth ? stepDist_m : 0,
+      walk_speed_ms: isMovingForHealth ? actualSpeed : 0,
+      ambient_temp_c: state.weather?.temp_c ?? -63,
+    };
+    state.health = advanceGroupState(state.health, segment);
+    state.healthLastAggregate = aggregateGroupState(state.health);
+  }
+  /* === /G1+G2 === */
 }
 
 function updateOrbitalTelemetry() {
@@ -456,7 +468,6 @@ function renderHUD() {
   const pct = THREE.MathUtils.clamp((h.o2Remaining_l / reserve_l) * 100, 0, 100);
   const maxSafe = state.fisio.max_safe_slope_deg || 25;
 
-  /* Cajas inferiores derechas y barras inferiores izquierdas */
   hudElevEl.textContent = `${h.elev_m.toFixed(0)} m`;
   hudSlopeEl.textContent = `${h.slope_deg.toFixed(1)}°`;
   hudSlopeEl.style.color = h.slopeWarning ? '#ff3855' : '';
@@ -472,20 +483,17 @@ function renderHUD() {
     hudDatasetTagEl.textContent = state.datasetId.toUpperCase();
   }
 
-  /* Barra principal de O2 */
   if (hudO2BarEl) {
     hudO2BarEl.style.width = `${pct.toFixed(1)}%`;
     hudO2BarEl.classList.toggle('low', pct <= 40 && pct > 15);
     hudO2BarEl.classList.toggle('critical', pct <= 15);
   }
 
-  /* Barra secundaria de flujo metabólico (0..250 L/h) */
   if (hudFluxBarEl) {
     const fluxPct = THREE.MathUtils.clamp((h.o2Rate_l_h / 220) * 100, 6, 100);
     hudFluxBarEl.style.width = `${fluxPct.toFixed(0)}%`;
   }
 
-  /* Retícula central en 1ª persona */
   if (reticleSlopeFillEl) {
     const sPct = THREE.MathUtils.clamp((h.slope_deg / (maxSafe * 1.4)) * 100, 4, 100);
     reticleSlopeFillEl.style.width = `${sPct.toFixed(0)}%`;
@@ -499,7 +507,6 @@ function renderHUD() {
     }
   }
 
-  /* Badges de estado inferiores */
   const isRunning = h.speed_ms > state.fisio.walk_speed_ms * 1.25;
   if (badgeWalkEl) badgeWalkEl.classList.toggle('active', h.speed_ms > 0.05);
   if (badgeRunEl) badgeRunEl.classList.toggle('active', isRunning);
@@ -512,7 +519,6 @@ function renderHUD() {
     badgeO2El.classList.toggle('danger', pct <= 15);
   }
 
-  /* Alerta superior izquierda // MALFUNCTIONS */
   const o2Critical = pct <= 15;
   const isStorm = state.weather?.mode === 'dust_storm';
   if (hudAlertEl && hudAlertTextEl) {
@@ -535,9 +541,8 @@ function renderHUD() {
       : `Estabilidad nominal · Consumo ${h.o2Rate_l_h.toFixed(0)} L/h`;
   }
 
-  /* Brújula y Mini-radar topográfico */
   camera.getWorldDirection(_lookDir);
-  const yawRad = Math.atan2(_lookDir.x, -_lookDir.z); // 0 = Norte (-Z), +pi/2 = Este (+X)
+  const yawRad = Math.atan2(_lookDir.x, -_lookDir.z);
   const yawDeg = ((yawRad * 180) / Math.PI + 360) % 360;
   if (hudCompassTrackEl) {
     const shiftPx = -((yawDeg / 360) * 260);
@@ -548,10 +553,60 @@ function renderHUD() {
     drawHudMinimap(yawRad);
   }
 
-  /* Actualizar proximidad a Rovers / POIs y bitácora científica en 1ª persona (E3) */
   updateProximityScienceHUD();
+
+  /* === G1 + G2: panel de estado de salud === */
   renderGroupHUD();
+  /* === /G1+G2 === */
 }
+
+/* === G1 + G2: render del panel GROUP_STATUS con throttle a 5 Hz === */
+function renderGroupHUD() {
+  const nowMs = performance.now();
+  if (nowMs - (renderGroupHUD._lastMs || 0) < 200) return;
+  renderGroupHUD._lastMs = nowMs;
+
+  const panel = document.getElementById('group-status-panel');
+  const listEl = document.getElementById('group-members-list');
+  const metaEl = document.getElementById('group-status-meta');
+  const extraEl = document.getElementById('group-status-extra');
+  if (!panel || !listEl || !metaEl) return;
+
+  if (state.mode !== 'fp' || !state.healthLastAggregate) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+
+  const agg = state.healthLastAggregate;
+  const leaderIdx = agg.leaderIndex;
+  const modeLabel = agg.mode === 'solo' ? 'SOLO' : `GROUP · ${agg.members.length} · ROT ${agg.totalRotations}`;
+  metaEl.textContent = `${modeLabel} · leader: ${agg.leaderId ?? '—'}`;
+
+  listEl.innerHTML = agg.members.map((m, idx) => {
+    const isLeader = idx === leaderIdx;
+    const statusClass =
+      m.flags.o2_depleted || m.flags.over_sustainable_metabolic || m.flags.thermal_critical || m.flags.dehydration_critical ? 'critical'
+        : m.flags.hr_above_85pct_max || m.flags.o2_low || m.flags.thermal_warning || m.flags.dehydration_warning ? 'warn'
+          : 'nominal';
+    const roleTag = m.role === 'leader' ? 'L' : m.role === 'follower' ? 'F' : '·';
+    const tCore = typeof m.t_core_c === 'number' ? `${m.t_core_c.toFixed(1)}°C` : '—';
+    const hyd = typeof m.dehydration_pct_body_mass === 'number' ? `${m.dehydration_pct_body_mass.toFixed(1)}%` : '—';
+    return `<div class="group-member ${statusClass} ${isLeader ? 'leader' : ''}">
+      <span class="member-role">${roleTag}</span>
+      <span class="member-id">${m.id}</span>
+      <span class="member-metric">O₂ ${m.o2_remaining_l.toFixed(0)}L · ${m.heart_rate_bpm.toFixed(0)}bpm · ${m.metabolic_rate_w.toFixed(0)}W · ${tCore} · ${hyd}</span>
+    </div>`;
+  }).join('');
+
+  if (extraEl) {
+    const routeMode = (state.routeCostMode || 'oxygen').toUpperCase();
+    const tCore = typeof agg.max_t_core_c === 'number' ? `${agg.max_t_core_c.toFixed(1)}` : '—';
+    const hyd = typeof agg.max_dehydration_pct === 'number' ? `${agg.max_dehydration_pct.toFixed(1)}` : '—';
+    extraEl.textContent = `MODELO: G2 · RUTA: ${routeMode} · TÉRMICA: ${tCore}°C · DESHID: ${hyd}%`;
+  }
+}
+/* === /G1+G2 === */
 
 function updateProximityScienceHUD() {
   const pois = Array.isArray(state.pois) ? state.pois : [];
@@ -571,7 +626,7 @@ function updateProximityScienceHUD() {
   const px = camera.position.x;
   const pz = camera.position.z;
   let closest = null;
-  let minDist = 28.0; // Radio de interacción en metros a escala humana (28 m)
+  let minDist = 28.0;
 
   for (const poi of pois) {
     if (!Array.isArray(poi.position_m)) continue;
@@ -611,7 +666,6 @@ function triggerFirstPersonScienceInteraction() {
 
   state.completedPOIs.add(poi.id);
 
-  /* Si interactúa con el Refugio / Hábitat + Rover Perseverance, recargar O2 al 100% */
   let spectrumLine = '';
   if (poi.type === 'shelter') {
     state.hud.o2Remaining_l = state.fisio.o2_reserve_l;
@@ -619,7 +673,6 @@ function triggerFirstPersonScienceInteraction() {
   } else if (poi.type === 'hazard') {
     spectrumLine = `⚠ TELEMETRÍA GEOTÉCNICA: Pendiente local ${state.hud.slope_deg.toFixed(1)}° · Regolito inestable registrado`;
   } else {
-    /* Firma espectral simulada basada en misiones reales CRISM / PIXL */
     const signatures = [
       '🔬 ESPECTRO CRISM/PIXL: Filosilicatos Fe/Mg + Carbonatos hidratados · Biofirma: ALTA',
       '🔬 ESPECTRO SHERLOC/PIXL: Sulfatos hidratados + Sílice amorfa · Tubo de titanio sellado',
@@ -629,7 +682,6 @@ function triggerFirstPersonScienceInteraction() {
     spectrumLine = signatures[idx];
   }
 
-  /* Actualizar lista en la Bitácora EVA superior izquierda */
   if (hudSciListEl) {
     const completedNames = state.pois
       .filter((p) => state.completedPOIs.has(p.id))
@@ -638,7 +690,6 @@ function triggerFirstPersonScienceInteraction() {
     hudSciListEl.innerHTML = completedNames || 'Acércate a un Rover o POI y pulsa [E]';
   }
 
-  /* Mostrar tarjeta de telemetría científica en el visor durante 6 segundos */
   if (hudToastEl) {
     hudToastEl.hidden = false;
     if (hudToastTitleEl) hudToastTitleEl.textContent = `✓ ${poi.name.toUpperCase()}`;
@@ -660,15 +711,13 @@ function drawHudMinimap(yawRad) {
   const h = minimapCanvas.height;
   minimapCtx.clearRect(0, 0, w, h);
 
-  /* Fondo oscuro sci-fi */
   minimapCtx.fillStyle = 'rgba(6, 16, 20, 0.92)';
   minimapCtx.fillRect(0, 0, w, h);
 
   const px = state.astronautGroup ? state.astronautPosition.x : camera.position.x;
   const pz = state.astronautGroup ? state.astronautPosition.z : camera.position.z;
-  const scanRadius_m = 1000; // ventana de 2×2 km alrededor del astronauta
+  const scanRadius_m = 1000;
 
-  /* Curvas/celdas de nivel y zonas de pendiente alta (> max_safe_slope_deg) en rojo como en HUD_IDEA.jpeg */
   const cols = 30;
   const rows = 18;
   const cellW = w / cols;
@@ -688,7 +737,6 @@ function drawHudMinimap(yawRad) {
         minimapCtx.fillStyle = 'rgba(255, 56, 85, 0.68)';
         minimapCtx.fillRect(c * cellW, r * cellH, cellW + 0.5, cellH + 0.5);
       } else {
-        /* Bandas topográficas cian/verdosas */
         const band = Math.floor(elevRel / 25) % 2 === 0;
         minimapCtx.fillStyle = band
           ? 'rgba(45, 168, 158, 0.22)'
@@ -698,7 +746,6 @@ function drawHudMinimap(yawRad) {
     }
   }
 
-  /* Rejilla táctica sutil */
   minimapCtx.strokeStyle = 'rgba(102, 252, 241, 0.12)';
   minimapCtx.lineWidth = 1;
   for (let x = 30; x < w; x += 30) {
@@ -714,7 +761,6 @@ function drawHudMinimap(yawRad) {
     minimapCtx.stroke();
   }
 
-  /* Dibujar ruta A* si pasa por el área del mini-radar (T8) */
   if (state.route && Array.isArray(state.route.path_m) && state.route.path_m.length >= 2) {
     minimapCtx.strokeStyle = '#66fcf1';
     minimapCtx.lineWidth = 2;
@@ -734,7 +780,6 @@ function drawHudMinimap(yawRad) {
     minimapCtx.stroke();
   }
 
-  /* Dibujar POIs activos en el mini-radar (T9) */
   if (state.poiLayerEnabled && Array.isArray(state.pois)) {
     for (let i = 0; i < state.pois.length; i++) {
       const poi = state.pois[i];
@@ -755,14 +800,12 @@ function drawHudMinimap(yawRad) {
     }
   }
 
-  /* Cono de visión / flecha amarilla del astronauta en el centro */
   const cx = w * 0.5;
   const cy = h * 0.5;
   minimapCtx.save();
   minimapCtx.translate(cx, cy);
   minimapCtx.rotate(yawRad);
 
-  /* Haz de escaneo amarillo translúcido */
   minimapCtx.fillStyle = 'rgba(246, 201, 69, 0.22)';
   minimapCtx.beginPath();
   minimapCtx.moveTo(0, 0);
@@ -771,7 +814,6 @@ function drawHudMinimap(yawRad) {
   minimapCtx.closePath();
   minimapCtx.fill();
 
-  /* Flecha amarilla del jugador */
   minimapCtx.fillStyle = '#f6c945';
   minimapCtx.beginPath();
   minimapCtx.moveTo(0, -8);
@@ -805,42 +847,241 @@ function updateUI() {
   const isFP = state.mode === 'fp';
   modeBtn.textContent = isFP ? 'Volver a Vista Orbital' : 'Explorar (1ª Persona)';
   hintEl.textContent = isFP
-    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · Ratón = Mirar · ESC = Salir'
+    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · Ratón = Mirar · E = Analizar · C = Radio · T = Tormenta · M = Modo ruta · ESC = Salir'
     : 'Arrastra = Mover mapa · Rueda = Zoom · Clic = Info · Arrastra el astronauta al mapa';
   document.body.classList.toggle('fp', isFP);
 }
-function renderGroupHUD() {
-  const nowMs = performance.now();
-  if (nowMs - (renderGroupHUD._lastMs || 0) < 200) return;
-  renderGroupHUD._lastMs = nowMs;
+/* === Comparador clásico vs salud (Fase G2.5) === */
 
-  const panel = document.getElementById('group-status-panel');
-  const listEl = document.getElementById('group-members-list');
-  const metaEl = document.getElementById('group-status-meta');
-  if (!panel || !listEl || !metaEl) return;
+function initHealthRouteComparator() {
+  const presetSel = document.getElementById('hrc-preset');
+  const cbWrap = document.getElementById('hrc-checkboxes');
+  const recomputeBtn = document.getElementById('hrc-recompute-btn');
+  const applyHealthBtn = document.getElementById('hrc-apply-health-btn');
+  const applyClassicBtn = document.getElementById('hrc-apply-classic-btn');
 
-  if (state.mode !== 'fp' || !state.healthLastAggregate) {
-    panel.hidden = true;
+  console.log('[MarWalk] initHealthRouteComparator:', { presetSel: !!presetSel, cbWrap: !!cbWrap });
+  if (!presetSel || !cbWrap) return;
+
+  const syncCheckboxesFromState = () => {
+    cbWrap.querySelectorAll('input[data-dim]').forEach((cb) => {
+      cb.checked = !!state.routeCostDimensions[cb.dataset.dim];
+    });
+  };
+
+  const syncStateFromCheckboxes = () => {
+    for (const cb of cbWrap.querySelectorAll('input[data-dim]')) {
+      state.routeCostDimensions[cb.dataset.dim] = cb.checked;
+    }
+    state.routeCostPreset = 'custom';
+    presetSel.value = 'custom';
+  };
+
+  const applyPreset = (presetName) => {
+    const preset = PRESETS[presetName];
+    if (!preset) return;
+    state.routeCostDimensions = { ...preset };
+    state.routeCostPreset = presetName;
+    syncCheckboxesFromState();
+  };
+
+  presetSel.addEventListener('change', () => {
+    const v = presetSel.value;
+    if (v === 'custom') return;
+    applyPreset(v);
+    scheduleRecompute();
+  });
+
+  cbWrap.addEventListener('change', () => {
+    syncStateFromCheckboxes();
+    scheduleRecompute();
+  });
+
+  recomputeBtn?.addEventListener('click', () => recomputeComparison());
+
+  const updateButtonsState = () => {
+    applyHealthBtn?.classList.toggle('active', !!state.healthRouteActive);
+    applyClassicBtn?.classList.toggle('active', !state.healthRouteActive);
+  };
+
+  applyHealthBtn?.addEventListener('click', () => {
+    if (!state.healthRouteResult?.health) return;
+    state.healthRouteActive = true;
+    const path_m = state.healthRouteResult.health.path_m;
+    applyRouteToScene({
+      dataset_id: state.datasetId || CONFIG.DEFAULT_DATASET,
+      algorithm: 'health',
+      path_m,
+      metrics: state.healthRouteResult.health.metrics,
+    });
+    updateButtonsState();
+    console.log('[MarWalk] Ruta de salud aplicada al mapa');
+  });
+
+  applyClassicBtn?.addEventListener('click', () => {
+    if (!state.healthRouteResult?.classic) return;
+    state.healthRouteActive = false;
+    const path_m = state.healthRouteResult.classic.path_m;
+    applyRouteToScene({
+      dataset_id: state.datasetId || CONFIG.DEFAULT_DATASET,
+      algorithm: 'astar',
+      path_m,
+      metrics: state.healthRouteResult.classic.metrics,
+    });
+    updateButtonsState();
+    console.log('[MarWalk] Ruta clásica restaurada al mapa');
+  });
+
+  const detailsEl = document.getElementById('health-route-compare');
+  detailsEl?.addEventListener('toggle', () => {
+    if (detailsEl.open && !state.routeComparison && !state.routeComparisonComputing) {
+      scheduleRecompute();
+    }
+  });
+
+  state.hooks.onRouteUpdated = () => {
+    state.healthRouteActive = false;
+    updateButtonsState();
+    scheduleRecompute();
+  };
+
+  syncCheckboxesFromState();
+  updateButtonsState();
+  if (state.route?.path_m?.length >= 2) {
+    scheduleRecompute();
+  }
+  console.log('[MarWalk] Comparador inicializado ✓');
+}
+
+let _recomputeTimer = null;
+function scheduleRecompute() {
+  if (_recomputeTimer) clearTimeout(_recomputeTimer);
+  _recomputeTimer = setTimeout(() => recomputeComparison(), 250);
+}
+
+async function recomputeComparison() {
+  if (state.routeComparisonComputing) return;
+  const statusEl = document.getElementById('hrc-status');
+  const tableWrap = document.getElementById('hrc-table-wrap');
+  if (!statusEl) return;
+
+  if (!state.route?.path_m || state.route.path_m.length < 2) {
+    statusEl.textContent = '⚠ Fija Inicio y Destino primero';
     return;
   }
-  panel.hidden = false;
 
-  const agg = state.healthLastAggregate;
-  const leaderIdx = agg.leaderIndex;
-  const modeLabel = agg.mode === 'solo' ? 'SOLO' : `GROUP · ${agg.members.length} · ROT ${agg.totalRotations}`;
-  metaEl.textContent = `${modeLabel} · leader: ${agg.leaderId ?? '—'}`;
+  const start_m = state.route.path_m[0];
+  const goal_m = state.route.path_m[state.route.path_m.length - 1];
+  const group = state.health || createSoloHealth();
 
-  listEl.innerHTML = agg.members.map((m, idx) => {
-    const isLeader = idx === leaderIdx;
-    const statusClass =
-      m.flags.o2_depleted || m.flags.over_sustainable_metabolic ? 'critical'
-        : m.flags.hr_above_85pct_max || m.flags.o2_low ? 'warn'
-          : 'nominal';
-    const roleTag = m.role === 'leader' ? 'L' : m.role === 'follower' ? 'F' : '·';
-    return `<div class="group-member ${statusClass}">
-      <span class="member-role">${roleTag}</span>
-      <span class="member-id">${m.id}</span>
-      <span class="member-metric">O₂ ${m.o2_remaining_l.toFixed(0)}L · ${m.heart_rate_bpm.toFixed(0)}bpm · ${m.metabolic_rate_w.toFixed(0)}W</span>
-    </div>`;
-  }).join('');
+  const sampleElev = (x, z) => sampleDemHeightRelM(x, z) ?? 0;
+  const sampleSlope = (x, z) => sampleSlopeDeg(x, z) ?? 0;
+  const res_m = state.metadata?.resolution_m || 20;
+  const cols = state.metadata?.shape?.[1];
+  const rows = state.metadata?.shape?.[0];
+  const ambientC = state.weather?.temp_c ?? -63;
+
+  if (!cols || !rows) {
+    statusEl.textContent = '⚠ metadata del DEM incompleta';
+    return;
+  }
+
+  state.routeComparisonComputing = true;
+  statusEl.textContent = 'Calculando clásica…';
+  await new Promise((r) => setTimeout(r, 0));
+
+  const classicResult = computeHealthAwareRoute({
+    sampleElevation: sampleElev, sampleSlope,
+    resolution_m: res_m, cols, rows,
+    start_m, goal_m, group, dimensions: PRESETS.classic,
+    options: { ambient_temp_c: ambientC },
+  });
+
+  if (classicResult.failed) {
+    statusEl.textContent = `⚠ Clásica: ${classicResult.error}`;
+    state.routeComparisonComputing = false;
+    return;
+  }
+
+  statusEl.textContent = 'Calculando salud…';
+  await new Promise((r) => setTimeout(r, 0));
+
+  const healthResult = computeHealthAwareRoute({
+    sampleElevation: sampleElev, sampleSlope,
+    resolution_m: res_m, cols, rows,
+    start_m, goal_m, group, dimensions: state.routeCostDimensions,
+    options: { ambient_temp_c: ambientC },
+  });
+
+  if (healthResult.failed) {
+    statusEl.textContent = `⚠ Salud: ${healthResult.error}`;
+    state.routeComparisonComputing = false;
+    return;
+  }
+
+  statusEl.textContent = 'Comparando…';
+  await new Promise((r) => setTimeout(r, 0));
+
+  const comp = compareRoutes(
+    classicResult.path_m, healthResult.path_m,
+    sampleElev, sampleSlope, group, ambientC,
+  );
+
+  state.routeComparison = comp;
+  state.healthRouteResult = { classic: classicResult, health: healthResult };
+  state.routeComparisonComputing = false;
+
+  renderComparisonTable(comp);
+  if (tableWrap) tableWrap.hidden = false;
+  statusEl.textContent = '✓ Listo';
+}
+
+function renderComparisonTable(comp) {
+  const tbody = document.getElementById('hrc-table-body');
+  const verdict = document.getElementById('hrc-verdict');
+  if (!tbody) return;
+  const { classic, health, deltas } = comp;
+  if (!classic || !health || !deltas) {
+    tbody.innerHTML = '<tr><td colspan="4">Sin datos</td></tr>';
+    return;
+  }
+
+  const fmtPct = (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`;
+  const fmtAbs = (v, digits = 0) => `${v > 0 ? '+' : ''}${v.toFixed(digits)}`;
+  const classFor = (v, invert = false) => {
+    const positive = v > 0;
+    const good = invert ? positive : !positive;
+    if (Math.abs(v) < 0.5) return 'delta-neutral';
+    return good ? 'delta-good' : 'delta-bad';
+  };
+
+  const rows = [
+    { label: 'Distancia (m)', classic: classic.total_distance_m.toFixed(0), health: health.total_distance_m.toFixed(0), delta: fmtAbs(deltas.distance_m) + ' (' + fmtPct(deltas.distance_pct) + ')', cls: classFor(deltas.distance_m) },
+    { label: 'Pendiente máx (°)', classic: classic.max_slope_deg.toFixed(1), health: health.max_slope_deg.toFixed(1), delta: fmtAbs(deltas.max_slope_deg, 1) + '°', cls: classFor(deltas.max_slope_deg) },
+    { label: 'Peak M (W)', classic: classic.peak_metabolic_w.toFixed(0), health: health.peak_metabolic_w.toFixed(0), delta: fmtAbs(deltas.peak_metabolic_w) + ' (' + fmtPct(deltas.peak_metabolic_pct) + ')', cls: classFor(deltas.peak_metabolic_w) },
+    { label: 'Peak FC (bpm)', classic: classic.peak_hr_bpm.toFixed(0), health: health.peak_hr_bpm.toFixed(0), delta: fmtAbs(deltas.peak_hr_bpm) + ' (' + fmtPct(deltas.peak_hr_pct) + ')', cls: classFor(deltas.peak_hr_bpm) },
+    { label: 'O₂ usado (L)', classic: classic.o2_used_l.toFixed(1), health: health.o2_used_l.toFixed(1), delta: fmtAbs(deltas.o2_used_l, 1) + ' (' + fmtPct(deltas.o2_used_pct) + ')', cls: classFor(deltas.o2_used_l) },
+    { label: 'Peak T_core (°C)', classic: classic.peak_t_core_c.toFixed(2), health: health.peak_t_core_c.toFixed(2), delta: fmtAbs(deltas.peak_t_core_c, 2) + '°C', cls: classFor(deltas.peak_t_core_c) },
+    { label: 'Deshidrat. máx (%)', classic: classic.peak_dehydration_pct.toFixed(2), health: health.peak_dehydration_pct.toFixed(2), delta: fmtAbs(deltas.peak_dehydration_pct, 2) + '%', cls: classFor(deltas.peak_dehydration_pct) },
+    { label: 'Estado final', classic: classic.status, health: health.status, delta: deltas.status_changed ? 'cambió' : 'igual', cls: health.status === 'nominal' ? 'delta-good' : (health.status === 'critical' ? 'delta-bad' : 'delta-neutral') },
+  ];
+
+  tbody.innerHTML = rows.map((r) => `
+    <tr>
+      <td>${r.label}</td>
+      <td>${r.classic}</td>
+      <td>${r.health}</td>
+      <td class="${r.cls}">${r.delta}</td>
+    </tr>
+  `).join('');
+
+  const direction = deltas.distance_m > 0 ? 'más larga' : 'más corta';
+  const benefit = deltas.peak_metabolic_pct < 0
+    ? `reduce el peak metabólico en ${Math.abs(deltas.peak_metabolic_pct).toFixed(0)}%`
+    : `no reduce el peak metabólico`;
+  if (verdict) {
+    verdict.textContent = `La ruta de salud es ${Math.abs(deltas.distance_m).toFixed(0)} m ${direction} ` +
+      `(${deltas.distance_pct >= 0 ? '+' : ''}${deltas.distance_pct.toFixed(1)}%) y ${benefit}. ` +
+      `Pendiente máxima: ${classic.max_slope_deg.toFixed(1)}° → ${health.max_slope_deg.toFixed(1)}°.`;
+  }
 }
