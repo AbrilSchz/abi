@@ -2,6 +2,10 @@
 
 Aplicación 3D interactiva en navegador (ES Modules + Three.js, sin empaquetador) para exploración orbital y en primera persona de modelos digitales de elevación (DEM) marcianos, con telemetría fisiológica EVA (`PLSS`), sistema de capas científicas (*Layered View*), puntos de interés (`POIs`) y planificación de rutas seguras mediante **A\* (Clásico)** y **QAOA (Cuántico-inspirado)**.
 
+## Documentación
+
+- [Presentación MarsWalker](docs/Presentacion_MarsWalker.html) — página web de presentación del proyecto (abrir el HTML en el navegador).
+
 ---
 
 ## 1. Inicio rápido (Servidor estático local)
